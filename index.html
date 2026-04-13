@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="アカペラ練習">
+  <meta name="theme-color" content="#5e5ce6">
+  <title>アカペラ練習サポート</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== タブバー ===== -->
+  <nav class="tab-bar" role="tablist">
+    <button class="tab-btn active" data-tab="analysis" role="tab" aria-selected="true">
+      <span class="tab-icon" aria-hidden="true">🎙</span>
+      <span class="tab-label">解析・ログ</span>
+    </button>
+    <button class="tab-btn" data-tab="pitch" role="tab" aria-selected="false">
+      <span class="tab-icon" aria-hidden="true">🎵</span>
+      <span class="tab-label">ピッチパイプ</span>
+    </button>
+    <button class="tab-btn" data-tab="metronome" role="tab" aria-selected="false">
+      <span class="tab-icon" aria-hidden="true">🥁</span>
+      <span class="tab-label">メトロノーム</span>
+    </button>
+  </nav>
+
+  <!-- ===== タブコンテンツ ===== -->
+  <main class="tab-content">
+
+    <!-- 解析・ログ（フェーズ2プレースホルダー） -->
+    <section id="tab-analysis" class="tab-panel active" role="tabpanel">
+      <div class="placeholder">
+        <div class="placeholder-icon">🎙️</div>
+        <h2>録音解析</h2>
+        <p>フェーズ2で実装予定です。<br>音源を取得した後に追加されます。</p>
+        <div class="placeholder-hint">
+          <p>📋 練習後の音源をアップロードすると<br>AIがフィードバックをカード形式で整理します</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ピッチパイプ -->
+    <section id="tab-pitch" class="tab-panel" role="tabpanel">
+      <div class="panel-content">
+        <h2 class="panel-title">ピッチパイプ</h2>
+
+        <!-- 音色選択 -->
+        <div class="card control-group">
+          <span class="control-label">音色</span>
+          <div class="segment-control" id="wave-type" role="group" aria-label="音色選択">
+            <button class="segment-btn active" data-wave="sine">サイン波</button>
+            <button class="segment-btn" data-wave="triangle">三角波</button>
+            <button class="segment-btn" data-wave="square">矩形波</button>
+          </div>
+        </div>
+
+        <!-- 基準周波数 -->
+        <div class="card control-group">
+          <div class="freq-header">
+            <span class="control-label">基準周波数（A4）</span>
+            <span class="freq-display" id="freq-display">440.0 Hz</span>
+          </div>
+          <div class="freq-controls">
+            <button class="adj-btn" id="freq-down-big" aria-label="−1Hz">−1</button>
+            <button class="adj-btn" id="freq-down" aria-label="−0.1Hz">−0.1</button>
+            <input type="range" id="freq-slider" min="420" max="460" step="0.1" value="440"
+              class="freq-slider" aria-label="基準周波数スライダー">
+            <button class="adj-btn" id="freq-up" aria-label="+0.1Hz">+0.1</button>
+            <button class="adj-btn" id="freq-up-big" aria-label="+1Hz">+1</button>
+          </div>
+        </div>
+
+        <!-- 音名ボタン（12音） -->
+        <div class="note-grid" id="note-grid" role="group" aria-label="音名ボタン">
+          <!-- JS で生成 -->
+        </div>
+
+        <!-- 全音停止 -->
+        <button class="stop-notes-btn" id="stop-notes-btn">全音停止</button>
+      </div>
+    </section>
+
+    <!-- メトロノーム -->
+    <section id="tab-metronome" class="tab-panel" role="tabpanel">
+      <div class="panel-content">
+        <h2 class="panel-title">メトロノーム</h2>
+
+        <!-- 拍インジケーター -->
+        <div class="card beat-indicator-wrap">
+          <div class="beat-indicator" id="beat-indicator" aria-live="polite" aria-label="拍インジケーター">
+            <!-- JS で生成 -->
+          </div>
+        </div>
+
+        <!-- BPM コントロール -->
+        <div class="card bpm-control">
+          <button class="bpm-adj-btn" id="bpm-down-big" aria-label="BPM −10">−10</button>
+          <button class="bpm-adj-btn" id="bpm-down" aria-label="BPM −1">−1</button>
+          <div class="bpm-display-wrap">
+            <input type="number" id="bpm-input" class="bpm-input"
+              value="120" min="20" max="300" aria-label="BPM入力">
+            <span class="bpm-unit">BPM</span>
+          </div>
+          <button class="bpm-adj-btn" id="bpm-up" aria-label="BPM +1">+1</button>
+          <button class="bpm-adj-btn" id="bpm-up-big" aria-label="BPM +10">+10</button>
+        </div>
+
+        <!-- BPM スライダー -->
+        <div class="card">
+          <input type="range" id="bpm-slider" min="20" max="300" value="120"
+            class="bpm-slider" aria-label="BPMスライダー">
+        </div>
+
+        <!-- 拍子選択 -->
+        <div class="card control-group">
+          <span class="control-label">拍子</span>
+          <div class="segment-control" id="time-sig" role="group" aria-label="拍子選択">
+            <button class="segment-btn active" data-sig="4/4">4/4</button>
+            <button class="segment-btn" data-sig="3/4">3/4</button>
+            <button class="segment-btn" data-sig="2/4">2/4</button>
+            <button class="segment-btn" data-sig="6/8">6/8</button>
+          </div>
+        </div>
+
+        <!-- タップテンポ -->
+        <button class="tap-btn" id="tap-btn" aria-label="タップテンポ">
+          タップテンポ
+        </button>
+
+        <!-- スタート / ストップ -->
+        <button class="metro-toggle-btn" id="metro-toggle">▶ スタート</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== 共通コントローラー（画面下部固定） ===== -->
+  <div class="common-controller" role="region" aria-label="共通コントローラー">
+    <div class="bpm-info">
+      <span class="bpm-label">BPM</span>
+      <span class="bpm-value" id="bottom-bpm">120</span>
+    </div>
+    <button class="global-stop-btn" id="global-stop" aria-label="全停止">
+      ■ 全停止
+    </button>
+  </div>
+
+  <script src="pitch-pipe.js"></script>
+  <script src="metronome.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

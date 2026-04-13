@@ -1,0 +1,11 @@
+{
+  "name": "アカペラ練習サポート",
+  "short_name": "アカペラ練習",
+  "description": "ピッチパイプ・メトロノーム・録音解析を一元化したアカペラ練習アプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#5e5ce6",
+  "orientation": "portrait-primary",
+  "lang": "ja"
+}

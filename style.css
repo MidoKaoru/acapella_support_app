@@ -1,0 +1,585 @@
+/* =============================================
+   アカペラ練習サポート — style.css
+   スマホファースト / iOS Safari 最適化
+   ============================================= */
+
+:root {
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --primary: #5e5ce6;
+  --primary-light: rgba(94, 92, 230, 0.12);
+  --primary-dark: #4b49c8;
+  --text: #1c1c1e;
+  --text-secondary: #6e6e73;
+  --border: #e5e5ea;
+  --danger: #ff3b30;
+  --danger-light: rgba(255, 59, 48, 0.1);
+  --success: #30d158;
+  --sharp-bg: #e8e8ed;
+
+  --tab-height: 56px;
+  --controller-height: 72px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ===== リセット ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+input[type="number"],
+input[type="range"] {
+  font-family: inherit;
+}
+
+/* ===== タブバー ===== */
+.tab-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  height: calc(var(--tab-height) + var(--safe-top));
+  padding-top: var(--safe-top);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  min-height: 44px;
+  padding: 4px 0;
+  transition: color 0.15s;
+  position: relative;
+}
+
+.tab-btn.active {
+  color: var(--primary);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px 1px 0 0;
+}
+
+.tab-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tab-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* ===== タブコンテンツ ===== */
+.tab-content {
+  padding-top: calc(var(--tab-height) + var(--safe-top));
+  padding-bottom: calc(var(--controller-height) + var(--safe-bottom) + 8px);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.panel-content {
+  padding: 16px;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  padding: 4px 0 2px;
+}
+
+/* ===== カード ===== */
+.card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+/* ===== コントロールグループ ===== */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* ===== セグメントコントロール ===== */
+.segment-control {
+  display: flex;
+  background: var(--bg);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.segment-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 4px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-height: 44px;
+  transition: all 0.15s;
+}
+
+.segment-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== 基準周波数 ===== */
+.freq-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.freq-display {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.freq-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.adj-btn {
+  border: none;
+  background: var(--bg);
+  border-radius: 8px;
+  min-width: 48px;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+
+.adj-btn:active {
+  background: var(--border);
+}
+
+/* range スライダー共通 */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  background: var(--primary);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(94, 92, 230, 0.4);
+}
+
+.freq-slider {
+  flex: 1;
+}
+
+/* ===== 音名グリッド ===== */
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.note-btn {
+  border: 2px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s;
+}
+
+.note-btn.sharp {
+  background: var(--sharp-bg);
+}
+
+.note-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  transform: scale(0.97);
+  box-shadow: 0 4px 12px rgba(94, 92, 230, 0.35);
+}
+
+.note-sub {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.65;
+}
+
+.note-btn.active .note-sub {
+  opacity: 0.85;
+}
+
+/* 全音停止ボタン */
+.stop-notes-btn {
+  width: 100%;
+  border: 2px solid var(--danger);
+  background: var(--danger-light);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--danger);
+  min-height: 52px;
+  transition: background 0.1s;
+}
+
+.stop-notes-btn:active {
+  background: var(--danger);
+  color: white;
+}
+
+/* ===== メトロノーム ===== */
+
+/* 拍インジケーター */
+.beat-indicator-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.beat-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 44px;
+}
+
+.beat-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.06s, transform 0.06s;
+  flex-shrink: 0;
+}
+
+.beat-dot.accent {
+  background: var(--border);
+  border: 3px solid var(--primary);
+}
+
+.beat-dot.lit {
+  background: var(--primary);
+  transform: scale(1.15);
+}
+
+.beat-dot.accent.lit {
+  background: var(--primary);
+  transform: scale(1.3);
+  box-shadow: 0 0 8px rgba(94, 92, 230, 0.5);
+}
+
+/* BPM コントロール */
+.bpm-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bpm-adj-btn {
+  border: none;
+  background: var(--bg);
+  border-radius: 9px;
+  min-width: 52px;
+  min-height: 52px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+
+.bpm-adj-btn:active {
+  background: var(--border);
+}
+
+.bpm-display-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.bpm-input {
+  border: none;
+  background: transparent;
+  font-size: 42px;
+  font-weight: 700;
+  text-align: center;
+  width: 100%;
+  color: var(--text);
+  line-height: 1;
+  -moz-appearance: textfield;
+  font-variant-numeric: tabular-nums;
+}
+
+.bpm-input::-webkit-inner-spin-button,
+.bpm-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+.bpm-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+}
+
+/* タップテンポ */
+.tap-btn {
+  width: 100%;
+  border: 2px solid var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 600;
+  min-height: 60px;
+  transition: background 0.1s, color 0.1s;
+  letter-spacing: 0.2px;
+}
+
+.tap-btn:active {
+  background: var(--primary);
+  color: white;
+}
+
+/* スタート / ストップ */
+.metro-toggle-btn {
+  width: 100%;
+  border: none;
+  background: var(--primary);
+  color: white;
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  min-height: 60px;
+  transition: background 0.15s;
+  box-shadow: 0 4px 14px rgba(94, 92, 230, 0.35);
+  letter-spacing: 0.2px;
+}
+
+.metro-toggle-btn.playing {
+  background: var(--danger);
+  box-shadow: 0 4px 14px rgba(255, 59, 48, 0.35);
+}
+
+/* ===== 共通コントローラー ===== */
+.common-controller {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  height: calc(var(--controller-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.bpm-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.bpm-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.bpm-value {
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.global-stop-btn {
+  border: none;
+  background: var(--danger);
+  color: white;
+  border-radius: 18px;
+  padding: 14px 24px;
+  font-size: 18px;
+  font-weight: 700;
+  min-height: 56px;
+  min-width: 120px;
+  box-shadow: 0 4px 16px rgba(255, 59, 48, 0.4);
+  transition: transform 0.08s, box-shadow 0.08s;
+  letter-spacing: 0.3px;
+}
+
+.global-stop-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 8px rgba(255, 59, 48, 0.3);
+}
+
+/* ===== プレースホルダー（解析タブ） ===== */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100dvh - var(--tab-height) - var(--controller-height) - 60px);
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  gap: 12px;
+}
+
+.placeholder-icon {
+  font-size: 72px;
+  line-height: 1;
+}
+
+.placeholder h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.placeholder p {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.placeholder-hint {
+  margin-top: 8px;
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 16px 20px;
+  max-width: 320px;
+}
+
+.placeholder-hint p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ===== デスクトップ補完 ===== */
+@media (min-width: 600px) {
+  .note-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  .panel-content {
+    padding: 20px 24px;
+  }
+}
