@@ -93,7 +93,7 @@ class Metronome {
 
   tapTempo() {
     const now = Date.now();
-    this._tapTimes = this._tapTimes.filter(t => now - t < 3000);
+    this._tapTimes = this._tapTimes.filter(t => now - t < 2000);
     this._tapTimes.push(now);
     if (this._tapTimes.length < 2) return null;
     const intervals = [];
