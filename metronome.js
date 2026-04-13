@@ -4,8 +4,9 @@
  * - Web Audio API ルックアヘッドスケジューリング（精度優先）
  * - 1拍目アクセント音
  * - タップテンポ
- * - バックグラウンド再生：無音ループ + Media Session API
- * - iOS Safari 対応
+ * - クリック音3種類：クリック / ウッドブロック / ベル
+ * - バックグラウンド再生：MediaStreamDestination + Audio要素（iOS対応）
+ * - Media Session API（ロック画面から操作）
  */
 
 class Metronome {
@@ -17,17 +18,21 @@ class Metronome {
     this.beatsPerMeasure = 4;
     this.currentBeat     = 0;
     this.nextBeatTime    = 0;
+    this.soundType       = 'click'; // 'click' | 'woodblock' | 'bell'
 
     // スケジューラー設定
-    this._lookaheadMs     = 25;   // setInterval 間隔 (ms)
-    this._scheduleAhead   = 0.12; // 先読み時間 (秒)
-    this._timerID         = null;
+    this._lookaheadMs   = 25;   // setInterval 間隔 (ms)
+    this._scheduleAhead = 0.12; // 先読み時間 (秒)
+    this._timerID       = null;
 
     // タップテンポ
     this._tapTimes = [];
 
     // バックグラウンド再生用
-    this._silentSource = null;
+    this._bgAudio      = null; // Audio 要素
+    this._bgOsc        = null; // 無音 OscillatorNode
+    this._bgDest       = null; // MediaStreamDestination
+    this._silentSource = null; // フォールバック用 BufferSource
 
     // 拍ごとの UI コールバック（app.js からセット）
     this.onBeat = null; // (beatIndex: number) => void   -1 = 停止
@@ -54,15 +59,19 @@ class Metronome {
     this.currentBeat = 0;
   }
 
+  setSoundType(type) {
+    this.soundType = type;
+  }
+
   start() {
     if (!this.audioContext || this.isPlaying) return;
     if (this.audioContext.state === 'suspended') this.audioContext.resume();
 
-    this.isPlaying   = true;
-    this.currentBeat = 0;
+    this.isPlaying    = true;
+    this.currentBeat  = 0;
     this.nextBeatTime = this.audioContext.currentTime + 0.05;
 
-    this._startSilentLoop();
+    this._startBackgroundAudio();
     this._setupMediaSession();
     this._schedule();
   }
@@ -71,7 +80,7 @@ class Metronome {
     if (!this.isPlaying) return;
     this.isPlaying = false;
     clearTimeout(this._timerID);
-    this._stopSilentLoop();
+    this._stopBackgroundAudio();
 
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'none';
@@ -86,7 +95,6 @@ class Metronome {
    */
   tapTempo() {
     const now = Date.now();
-    // 3秒以上前のタップは破棄
     this._tapTimes = this._tapTimes.filter(t => now - t < 3000);
     this._tapTimes.push(now);
 
@@ -97,16 +105,13 @@ class Metronome {
       intervals.push(this._tapTimes[i] - this._tapTimes[i - 1]);
     }
     const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const bpm = Math.round(60000 / avg);
-    return Math.max(20, Math.min(300, bpm));
+    return Math.max(20, Math.min(300, Math.round(60000 / avg)));
   }
 
   // ─── 内部: スケジューラー ────────────────────
 
   _schedule() {
     const ctx = this.audioContext;
-
-    // コンテキストが停止していたら復帰を試みる
     if (ctx.state === 'suspended') ctx.resume();
 
     while (this.nextBeatTime < ctx.currentTime + this._scheduleAhead) {
@@ -120,23 +125,16 @@ class Metronome {
     }, this._lookaheadMs);
   }
 
-  /** クリック音を指定時刻にスケジュール */
+  /** 音種ごとにクリック音をスケジュール */
   _scheduleClick(time, beat) {
     const ctx      = this.audioContext;
     const isAccent = beat === 0;
 
-    const osc = ctx.createOscillator();
-    const env = ctx.createGain();
-
-    // アクセント：高め・大きめ / 通常：低め・小さめ
-    osc.frequency.value = isAccent ? 1050 : 800;
-    env.gain.setValueAtTime(isAccent ? 0.75 : 0.45, time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
-
-    osc.connect(env);
-    env.connect(ctx.destination);
-    osc.start(time);
-    osc.stop(time + 0.06);
+    switch (this.soundType) {
+      case 'woodblock': this._soundWoodblock(ctx, time, isAccent); break;
+      case 'bell':      this._soundBell(ctx, time, isAccent);      break;
+      default:          this._soundClick(ctx, time, isAccent);     break;
+    }
 
     // UI 更新タイマー（オーディオ再生と同期）
     const delayMs = Math.max(0, (time - ctx.currentTime) * 1000);
@@ -145,31 +143,137 @@ class Metronome {
     }, delayMs);
   }
 
+  // ─── 音種ごとの音生成 ─────────────────────────
+
+  /** クリック（デフォルト）: 矩形的な短い音 */
+  _soundClick(ctx, time, isAccent) {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.frequency.value = isAccent ? 1050 : 800;
+    env.gain.setValueAtTime(isAccent ? 0.75 : 0.45, time);
+    env.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+    osc.connect(env);
+    env.connect(ctx.destination);
+    osc.start(time);
+    osc.stop(time + 0.06);
+  }
+
+  /** ウッドブロック: ノイズ + バンドパスフィルター */
+  _soundWoodblock(ctx, time, isAccent) {
+    const bufLen = Math.floor(ctx.sampleRate * 0.08);
+    const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+
+    const src    = ctx.createBufferSource();
+    const filter = ctx.createBiquadFilter();
+    const env    = ctx.createGain();
+
+    src.buffer         = buf;
+    filter.type        = 'bandpass';
+    filter.frequency.value = isAccent ? 920 : 680;
+    filter.Q.value     = 20;
+
+    env.gain.setValueAtTime(isAccent ? 1.3 : 0.85, time);
+    env.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+
+    src.connect(filter);
+    filter.connect(env);
+    env.connect(ctx.destination);
+    src.start(time);
+    src.stop(time + 0.09);
+  }
+
+  /** ベル: サイン波の倍音 + 長めの余韻 */
+  _soundBell(ctx, time, isAccent) {
+    const baseFreqs = isAccent ? [880, 1320, 2200] : [660, 990, 1650];
+    const gainBase  = isAccent ? 0.38 : 0.24;
+    const decay     = isAccent ? 0.55 : 0.38;
+
+    baseFreqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type           = 'sine';
+      osc.frequency.value = freq;
+      env.gain.setValueAtTime(gainBase / (i + 1), time);
+      env.gain.exponentialRampToValueAtTime(0.001, time + decay);
+      osc.connect(env);
+      env.connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + decay + 0.05);
+    });
+  }
+
   // ─── 内部: バックグラウンド再生 ─────────────
 
   /**
-   * 無音ループ（iOS でスリープ中も AudioContext を維持する）
-   * 完全な無音だと iOS が停止させる場合があるため
-   * 聴こえないレベルのノイズを混ぜる
+   * iOS Safari でスリープ中も AudioContext を維持する
+   *
+   * 方式①（推奨）: MediaStreamDestination + Audio 要素
+   *   AudioContext の出力を MediaStream 経由で Audio 要素に流す。
+   *   Audio 要素が iOS のオーディオセッションを保持し続けるため
+   *   画面ロック後もメトロノームが鳴り続ける。
+   *
+   * 方式②（フォールバック）: AudioBufferSource ループ
+   *   MediaStreamDestination が使えない環境向け。
    */
-  _startSilentLoop() {
-    if (!this.audioContext || this._silentSource) return;
-    const ctx        = this.audioContext;
-    const sampleRate = ctx.sampleRate;
-    const buffer     = ctx.createBuffer(1, sampleRate, sampleRate); // 1秒
-    const data       = buffer.getChannelData(0);
-    for (let i = 0; i < sampleRate; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.00005; // 実質無音
+  _startBackgroundAudio() {
+    if (this._bgAudio || this._silentSource) return;
+    const ctx = this.audioContext;
+
+    if (typeof ctx.createMediaStreamDestination === 'function') {
+      try {
+        const dest = ctx.createMediaStreamDestination();
+
+        // 実質無音の発振器でストリームを「空でない」状態にする
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.00001; // -100dB 相当、聴こえない
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start();
+
+        // Audio 要素でストリームを再生 → iOS オーディオセッション確保
+        const audio      = new Audio();
+        audio.srcObject  = dest.stream;
+        audio.volume     = 1;
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+
+        this._bgOsc   = osc;
+        this._bgDest  = dest;
+        this._bgAudio = audio;
+        return;
+      } catch (_) {
+        // フォールバックへ
+      }
     }
+
+    // フォールバック: 微小振幅バッファのループ再生
+    const sr  = ctx.sampleRate;
+    const buf = ctx.createBuffer(1, sr, sr);
+    const d   = buf.getChannelData(0);
+    for (let i = 0; i < sr; i++) d[i] = (Math.random() * 2 - 1) * 0.00005;
     const src  = ctx.createBufferSource();
-    src.buffer = buffer;
+    src.buffer = buf;
     src.loop   = true;
     src.connect(ctx.destination);
     src.start();
     this._silentSource = src;
   }
 
-  _stopSilentLoop() {
+  _stopBackgroundAudio() {
+    if (this._bgOsc) {
+      try { this._bgOsc.stop(); } catch (_) {}
+      this._bgOsc = null;
+    }
+    if (this._bgAudio) {
+      this._bgAudio.pause();
+      this._bgAudio.srcObject = null;
+      this._bgAudio = null;
+    }
+    this._bgDest = null;
+
     if (this._silentSource) {
       try { this._silentSource.stop(); } catch (_) {}
       this._silentSource = null;

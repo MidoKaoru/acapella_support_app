@@ -170,6 +170,16 @@ function initMetronome() {
     });
   });
 
+  // クリック音選択
+  document.querySelectorAll('#metro-sound-type .segment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#metro-sound-type .segment-btn')
+        .forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      metronome.setSoundType(btn.dataset.sound);
+    });
+  });
+
   // タップテンポ
   document.getElementById('tap-btn').addEventListener('click', () => {
     getAudioContext(); // iOS: 最初のタップで AudioContext を起動
