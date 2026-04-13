@@ -37,6 +37,9 @@ class Metronome {
     this._compressor  = null;
     this._masterGain  = null; // 既スケジュール音の即時消音用
 
+    // スケジューラー世代番号：古い onBeat コールバックを無効化するために使う
+    this._schedulerGen = 0;
+
     // バックグラウンド再生用
     this._bgAudio            = null;
     this._bgBlobUrl          = null;
@@ -80,6 +83,9 @@ class Metronome {
 
   setSoundType(type) {
     this.soundType = type;
+    if (this.isPlaying && this.audioContext) {
+      this._muteAndReschedule();
+    }
   }
 
   start() {
@@ -97,9 +103,9 @@ class Metronome {
     this.currentBeat  = 0;
     this.nextBeatTime = this.audioContext.currentTime + 0.05;
 
-    this._startBackgroundAudio().then(() => {
-      if (this.isPlaying) this._schedule();
-    });
+    // スケジューラーは即時開始（バックグラウンド音声の非同期処理を待たない）
+    this._schedule();
+    this._startBackgroundAudio(); // 並行して起動（await しない）
     this._setupMediaSession();
   }
 
@@ -148,6 +154,9 @@ class Metronome {
     const ctx = this.audioContext;
     clearTimeout(this._timerID);
     this._timerID = null;
+
+    // 世代番号を上げて古い onBeat コールバックを無効化
+    this._schedulerGen++;
 
     if (this._masterGain) {
       // 既存スケジュール音を 50ms かけてフェードアウト
@@ -227,9 +236,14 @@ class Metronome {
       default:          this._soundClick(ctx, time, isAccent);     break;
     }
 
+    // 世代番号を記録：_muteAndReschedule や visibilitychange 復帰時に
+    // 古い世代の onBeat が UI を二重点灯させないようにする
+    const gen     = this._schedulerGen;
     const delayMs = Math.max(0, (time - ctx.currentTime) * 1000);
     setTimeout(() => {
-      if (this.isPlaying && this.onBeat) this.onBeat(beat);
+      if (this.isPlaying && this.onBeat && this._schedulerGen === gen) {
+        this.onBeat(beat);
+      }
     }, delayMs);
   }
 
@@ -387,9 +401,20 @@ class Metronome {
       if (document.hidden || !this.isPlaying) return;
       const resumeCtx = this.audioContext;
       const resync = () => {
-        this.nextBeatTime = resumeCtx.currentTime + 0.05;
         clearTimeout(this._timerID);
         this._timerID = null;
+
+        // 世代番号を上げて古い onBeat コールバックを無効化
+        this._schedulerGen++;
+
+        // バックグラウンド中に溜まったスケジュール済み音を消音してから再開
+        if (this._masterGain) {
+          this._masterGain.gain.cancelScheduledValues(resumeCtx.currentTime);
+          this._masterGain.gain.setTargetAtTime(0, resumeCtx.currentTime, 0.005);
+          this._masterGain.gain.setValueAtTime(1, resumeCtx.currentTime + 0.05);
+        }
+
+        this.nextBeatTime = resumeCtx.currentTime + 0.06;
         this._schedule();
       };
       if (resumeCtx.state !== 'running') {
