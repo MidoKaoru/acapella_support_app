@@ -1,111 +1,78 @@
 /**
  * metronome.js
- * メトロノーム機能
- * - Web Audio API ルックアヘッドスケジューリング（精度優先）
- * - 1拍目アクセント音
- * - タップテンポ
- * - クリック音3種類：クリック / ウッドブロック / スネア
- * - DynamicsCompressor でクリック音をピッチパイプ音に埋もれにくくする
- * - バックグラウンド再生：WAV Blob + <audio loop>（iOS 対応）
- * - 先読み3秒：iOS の setTimeout throttle 対策
- * - マスターゲイン：BPM変更・停止時に既スケジュール音を即時消音
- * - Media Session API（ロック画面から操作）
+ * - ルックアヘッドスケジューリング（先読み3秒：iOS setTimeout throttle 対策）
+ * - _scheduledNodes でスケジュール済みノードを追跡し stop() で即時キャンセル
+ * - WAV Blob + <audio loop> でバックグラウンド再生（iOS 対応）
+ * - Media Session API（ロック画面操作）
  */
 
 class Metronome {
   constructor() {
-    this.audioContext = null;
-    this.isPlaying    = false;
-
+    this.audioContext    = null;
+    this.isPlaying       = false;
     this.bpm             = 120;
     this.beatsPerMeasure = 4;
     this.currentBeat     = 0;
     this.nextBeatTime    = 0;
-    this.soundType       = 'click'; // 'click' | 'woodblock' | 'snare'
+    this.soundType       = 'click';
 
-    // スケジューラー設定
-    // _scheduleAhead を3秒に設定：iOS バックグラウンドで setTimeout が
-    // 約1秒に1回しか呼ばれなくても、先読み済みの音が途切れないようにする
-    this._lookaheadMs   = 25;  // setTimeout 間隔 (ms) ─ フォアグラウンド時の精度用
-    this._scheduleAhead = 3.0; // 先読み時間 (秒)
+    this._lookaheadMs   = 25;
+    this._scheduleAhead = 3.0;
     this._timerID       = null;
+    this._schedulerGen  = 0;
 
-    // タップテンポ
-    this._tapTimes = [];
+    // スケジュール済み source ノードの追跡（キャンセル用）
+    this._scheduledNodes = [];
 
-    // メトロノーム出力用ノード
-    this._compressor  = null;
-    this._masterGain  = null; // 既スケジュール音の即時消音用
+    this._tapTimes   = [];
+    this._compressor = null;
 
-    // スケジューラー世代番号：古い onBeat コールバックを無効化するために使う
-    this._schedulerGen = 0;
-
-    // バックグラウンド再生用
     this._bgAudio            = null;
     this._bgBlobUrl          = null;
     this._silentSource       = null;
     this._onVisibilityChange = null;
     this._onStateChange      = null;
 
-    // 拍ごとの UI コールバック（app.js からセット）
-    this.onBeat = null; // (beatIndex: number) => void   -1 = 停止
+    this.onBeat = null;
   }
 
-  /** app.js から共有 AudioContext を注入 */
   setAudioContext(ctx) {
     this.audioContext = ctx;
     this._compressor  = null;
-    this._masterGain  = null;
   }
 
-  get _secondsPerBeat() {
-    return 60.0 / this.bpm;
-  }
+  get _secondsPerBeat() { return 60.0 / this.bpm; }
 
-  // ─── 公開 API ───────────────────────────────
+  // ─── 公開 API ───────────────────────────────────
 
   setBPM(bpm) {
     this.bpm = Math.max(20, Math.min(300, Math.round(bpm)));
-    if (this.isPlaying && this.audioContext) {
-      // 先読み済みの旧BPMのビートを消音してスケジューラーをリセット
-      this._muteAndReschedule();
-    }
+    if (this.isPlaying && this.audioContext) this._resetScheduler();
   }
 
   setTimeSignature(sig) {
     const map = { '4/4': 4, '3/4': 3, '2/4': 2, '6/8': 6 };
     this.beatsPerMeasure = map[sig] ?? 4;
     this.currentBeat = 0;
-    if (this.isPlaying && this.audioContext) {
-      this._muteAndReschedule();
-    }
+    if (this.isPlaying && this.audioContext) this._resetScheduler();
   }
 
   setSoundType(type) {
     this.soundType = type;
-    if (this.isPlaying && this.audioContext) {
-      this._muteAndReschedule();
-    }
+    if (this.isPlaying && this.audioContext) this._resetScheduler();
   }
 
   start() {
     if (!this.audioContext || this.isPlaying) return;
     if (this.audioContext.state === 'suspended') this.audioContext.resume();
 
-    // マスターゲインを確保し音量を 1 に戻す（前回 stop で 0 になっている場合）
-    const out = this._getOutput();
-    if (this._masterGain) {
-      this._masterGain.gain.cancelScheduledValues(this.audioContext.currentTime);
-      this._masterGain.gain.setValueAtTime(1, this.audioContext.currentTime);
-    }
+    this.isPlaying       = true;
+    this.currentBeat     = 0;
+    this.nextBeatTime    = this.audioContext.currentTime + 0.05;
+    this._scheduledNodes = [];
 
-    this.isPlaying    = true;
-    this.currentBeat  = 0;
-    this.nextBeatTime = this.audioContext.currentTime + 0.05;
-
-    // スケジューラーは即時開始（バックグラウンド音声の非同期処理を待たない）
     this._schedule();
-    this._startBackgroundAudio(); // 並行して起動（await しない）
+    this._startBackgroundAudio();
     this._setupMediaSession();
   }
 
@@ -114,19 +81,13 @@ class Metronome {
     this.isPlaying = false;
     clearTimeout(this._timerID);
     this._timerID = null;
+    this._schedulerGen++;
 
-    // 先読み済みの音を即時消音
-    if (this._masterGain && this.audioContext) {
-      this._masterGain.gain.cancelScheduledValues(this.audioContext.currentTime);
-      this._masterGain.gain.setTargetAtTime(0, this.audioContext.currentTime, 0.01);
-    }
+    // スケジュール済みの音を全て即時停止
+    this._cancelScheduledNodes();
 
     this._stopBackgroundAudio();
-
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = 'none';
-    }
-
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
     if (this.onBeat) this.onBeat(-1);
   }
 
@@ -135,7 +96,6 @@ class Metronome {
     this._tapTimes = this._tapTimes.filter(t => now - t < 3000);
     this._tapTimes.push(now);
     if (this._tapTimes.length < 2) return null;
-
     const intervals = [];
     for (let i = 1; i < this._tapTimes.length; i++) {
       intervals.push(this._tapTimes[i] - this._tapTimes[i - 1]);
@@ -144,40 +104,39 @@ class Metronome {
     return Math.max(20, Math.min(300, Math.round(60000 / avg)));
   }
 
-  // ─── 内部: 消音 + スケジューラーリセット ─────
+  // ─── スケジューラーリセット ──────────────────────
 
   /**
-   * BPM・拍子変更時に呼ぶ。
-   * 先読み済みの音を即時消音し、現在時刻から新しい設定で再スケジュールする。
+   * BPM・拍子・音色変更 / バックグラウンド復帰時に呼ぶ。
+   * スケジュール済みノードを stop() で即時停止し、現在時刻から再スケジュール。
+   * masterGain のゲイン操作は一切行わない（ゲイン操作では将来ノードを消せない）。
    */
-  _muteAndReschedule() {
-    const ctx = this.audioContext;
-
-    // 世代番号を上げる：古い _schedule() の setTimeout が世代違いで即リターンする
+  _resetScheduler() {
     this._schedulerGen++;
     clearTimeout(this._timerID);
     this._timerID = null;
 
-    if (this._masterGain) {
-      // 即時ミュート → 50ms 後に音量を戻す（フェードではなく瞬時切替）
-      this._masterGain.gain.cancelScheduledValues(ctx.currentTime);
-      this._masterGain.gain.setValueAtTime(0, ctx.currentTime);
-      this._masterGain.gain.setValueAtTime(1, ctx.currentTime + 0.05);
-    }
+    this._cancelScheduledNodes();
 
-    this.nextBeatTime = ctx.currentTime + 0.06;
+    this.nextBeatTime = this.audioContext.currentTime + 0.05;
     this._schedule();
   }
 
-  // ─── 内部: コンプレッサー + マスターゲイン ───
-
   /**
-   * メトロノーム専用の出力ノードを返す。
-   * 信号チェーン：各音源 → Compressor → MasterGain → destination
-   *
-   * - Compressor：高ゲインでも歪まずピッチパイプ音に埋もれにくい
-   * - MasterGain：stop/BPM変更時に既スケジュール音を即時消音する
+   * _scheduledNodes に登録されている全ノードを即時 stop() する。
+   * Web Audio API では stop(now) を呼ぶと、まだ start していないノードも
+   * 音を出さずに終了する（start time > stop time のため）。
    */
+  _cancelScheduledNodes() {
+    const now = this.audioContext ? this.audioContext.currentTime : 0;
+    for (const node of this._scheduledNodes) {
+      try { node.stop(now); } catch (_) {}
+    }
+    this._scheduledNodes = [];
+  }
+
+  // ─── 出力ノード ─────────────────────────────────
+
   _getOutput() {
     const ctx = this.audioContext;
     if (!this._compressor) {
@@ -187,27 +146,18 @@ class Metronome {
       comp.ratio.value     = 10;
       comp.attack.value    = 0.001;
       comp.release.value   = 0.05;
-
-      const master = ctx.createGain();
-      master.gain.value = 1;
-
-      comp.connect(master);
-      master.connect(ctx.destination);
-
+      comp.connect(ctx.destination);
       this._compressor = comp;
-      this._masterGain = master;
     }
     return this._compressor;
   }
 
-  // ─── 内部: スケジューラー ────────────────────
+  // ─── スケジューラー ──────────────────────────────
 
   _schedule() {
-    // 世代チェック：_muteAndReschedule や visibilitychange で世代が進んでいたら
-    // この _schedule() は古い呼び出しなので即リターンする
-    const gen = this._schedulerGen;
-
+    const gen = this._schedulerGen; // この世代番号でスケジューラーを識別
     const ctx = this.audioContext;
+
     if (ctx.state === 'suspended') {
       ctx.resume().then(() => {
         if (this.isPlaying && this._schedulerGen === gen) this._schedule();
@@ -215,7 +165,6 @@ class Metronome {
       return;
     }
 
-    // バックグラウンドから復帰時、nextBeatTime が大幅に過去になった場合はリセット
     if (this.nextBeatTime < ctx.currentTime - 0.5) {
       this.nextBeatTime = ctx.currentTime + 0.05;
     }
@@ -227,6 +176,7 @@ class Metronome {
     }
 
     this._timerID = setTimeout(() => {
+      // 世代が変わっていたら（_resetScheduler が呼ばれた）何もしない
       if (this.isPlaying && this._schedulerGen === gen) this._schedule();
     }, this._lookaheadMs);
   }
@@ -241,8 +191,6 @@ class Metronome {
       default:          this._soundClick(ctx, time, isAccent);     break;
     }
 
-    // 世代番号を記録：_muteAndReschedule や visibilitychange 復帰時に
-    // 古い世代の onBeat が UI を二重点灯させないようにする
     const gen     = this._schedulerGen;
     const delayMs = Math.max(0, (time - ctx.currentTime) * 1000);
     setTimeout(() => {
@@ -252,7 +200,7 @@ class Metronome {
     }, delayMs);
   }
 
-  // ─── 音種ごとの音生成 ─────────────────────────
+  // ─── 音生成（全ノードを _scheduledNodes に登録） ─
 
   _soundClick(ctx, time, isAccent) {
     const out = this._getOutput();
@@ -267,6 +215,12 @@ class Metronome {
     env.connect(out);
     osc.start(time);
     osc.stop(time + 0.06);
+
+    this._scheduledNodes.push(osc);
+    osc.onended = () => {
+      const i = this._scheduledNodes.indexOf(osc);
+      if (i !== -1) this._scheduledNodes.splice(i, 1);
+    };
   }
 
   _soundWoodblock(ctx, time, isAccent) {
@@ -292,12 +246,17 @@ class Metronome {
     env.connect(out);
     src.start(time);
     src.stop(time + 0.09);
+
+    this._scheduledNodes.push(src);
+    src.onended = () => {
+      const i = this._scheduledNodes.indexOf(src);
+      if (i !== -1) this._scheduledNodes.splice(i, 1);
+    };
   }
 
   _soundSnare(ctx, time, isAccent) {
     const out = this._getOutput();
 
-    // ノイズ成分
     const noiseLen  = Math.floor(ctx.sampleRate * 0.15);
     const noiseBuf  = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
     const noiseData = noiseBuf.getChannelData(0);
@@ -319,7 +278,6 @@ class Metronome {
     noiseSrc.start(time);
     noiseSrc.stop(time + 0.15);
 
-    // 低音成分
     const bodyOsc = ctx.createOscillator();
     const bodyEnv = ctx.createGain();
 
@@ -332,20 +290,20 @@ class Metronome {
     bodyEnv.connect(out);
     bodyOsc.start(time);
     bodyOsc.stop(time + 0.1);
+
+    this._scheduledNodes.push(noiseSrc, bodyOsc);
+    const cleanup = (node) => {
+      node.onended = () => {
+        const i = this._scheduledNodes.indexOf(node);
+        if (i !== -1) this._scheduledNodes.splice(i, 1);
+      };
+    };
+    cleanup(noiseSrc);
+    cleanup(bodyOsc);
   }
 
-  // ─── 内部: バックグラウンド再生（iOS 対応） ──
+  // ─── バックグラウンド再生（iOS 対応） ────────────
 
-  /**
-   * WAV Blob + <audio loop> 方式
-   *
-   * iOS Safari では createMediaStreamDestination() が iOS 11 から壊れているため、
-   * OfflineAudioContext で無音 WAV を生成して Blob URL を <audio loop> で再生する。
-   * 実際の音声ファイルを再生する <audio> 要素だけが iOS のオーディオセッションを維持できる。
-   *
-   * これに加えて先読み3秒のスケジューリングにより、
-   * iOS が setTimeout を throttle しても音が途切れない。
-   */
   async _startBackgroundAudio() {
     if (this._bgAudio || this._silentSource) return;
     const ctx = this.audioContext;
@@ -363,8 +321,7 @@ class Metronome {
       osc.stop(1);
 
       const rendered = await offCtx.startRendering();
-      const wavBlob  = this._audioBufferToWav(rendered);
-      const blobUrl  = URL.createObjectURL(wavBlob);
+      const blobUrl  = URL.createObjectURL(this._audioBufferToWav(rendered));
 
       const audio = new Audio();
       audio.src    = blobUrl;
@@ -372,18 +329,16 @@ class Metronome {
       audio.volume = 0.001;
       audio.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0.001;pointer-events:none;';
       document.body.appendChild(audio);
-
       await audio.play().catch(() => {});
 
       this._bgAudio   = audio;
       this._bgBlobUrl = blobUrl;
     } catch (_) {
-      // フォールバック
       const sr  = ctx.sampleRate;
       const buf = ctx.createBuffer(1, sr, sr);
       const d   = buf.getChannelData(0);
       for (let i = 0; i < sr; i++) d[i] = (Math.random() * 2 - 1) * 0.00005;
-      const src  = ctx.createBufferSource();
+      const src = ctx.createBufferSource();
       src.buffer = buf;
       src.loop   = true;
       src.connect(ctx.destination);
@@ -391,24 +346,19 @@ class Metronome {
       this._silentSource = src;
     }
 
-    // AudioContext の "interrupted"（iOS 独自状態）を検知して即座に resume
     this._onStateChange = () => {
       if (!this.isPlaying) return;
-      const state = this.audioContext.state;
-      if (state === 'suspended' || state === 'interrupted') {
+      const s = this.audioContext.state;
+      if (s === 'suspended' || s === 'interrupted') {
         this.audioContext.resume().catch(() => {});
       }
     };
     this.audioContext.addEventListener('statechange', this._onStateChange);
 
-    // 画面復帰時に AudioContext を再開してスケジューラーを再同期
     this._onVisibilityChange = () => {
       if (document.hidden || !this.isPlaying) return;
       const resumeCtx = this.audioContext;
-      const resync = () => {
-        // _muteAndReschedule と同じパターンで世代を上げてリセット
-        this._muteAndReschedule();
-      };
+      const resync = () => this._resetScheduler();
       if (resumeCtx.state !== 'running') {
         resumeCtx.resume().then(resync).catch(() => {});
       } else {
@@ -428,7 +378,6 @@ class Metronome {
     const arrBuf   = new ArrayBuffer(44 + len * 2);
     const view     = new DataView(arrBuf);
     const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
-
     writeStr(0, 'RIFF'); view.setUint32(4, 36 + len * 2, true);
     writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
     view.setUint32(16, 16, true); view.setUint16(20, 1, true);
@@ -466,17 +415,15 @@ class Metronome {
     }
   }
 
-  // ─── Media Session API ───────────────────────
+  // ─── Media Session API ───────────────────────────
 
   _setupMediaSession() {
     if (!('mediaSession' in navigator)) return;
-
     navigator.mediaSession.metadata = new MediaMetadata({
       title:  `メトロノーム ${this.bpm} BPM`,
       artist: 'アカペラ練習サポート',
     });
     navigator.mediaSession.playbackState = 'playing';
-
     navigator.mediaSession.setActionHandler('play',  () => this.start());
     navigator.mediaSession.setActionHandler('pause', () => this.stop());
     navigator.mediaSession.setActionHandler('stop',  () => this.stop());
