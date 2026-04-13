@@ -34,10 +34,10 @@ class Metronome {
 
     // バックグラウンド再生用
     this._bgAudio            = null;
-    this._bgOsc              = null;
-    this._bgDest             = null;
+    this._bgBlobUrl          = null;
     this._silentSource       = null;
     this._onVisibilityChange = null;
+    this._onStateChange      = null;
 
     // 拍ごとの UI コールバック（app.js からセット）
     this.onBeat = null; // (beatIndex: number) => void   -1 = 停止
@@ -77,9 +77,10 @@ class Metronome {
     this.currentBeat  = 0;
     this.nextBeatTime = this.audioContext.currentTime + 0.05;
 
-    this._startBackgroundAudio();
+    this._startBackgroundAudio().then(() => {
+      if (this.isPlaying) this._schedule();
+    });
     this._setupMediaSession();
-    this._schedule();
   }
 
   stop() {
@@ -270,97 +271,143 @@ class Metronome {
   // ─── 内部: バックグラウンド再生（iOS 対応） ──
 
   /**
-   * MediaStreamDestination + Audio 要素 方式
+   * WAV Blob + <audio loop> 方式
    *
-   * ポイント：
-   * 1. Audio 要素を document.body に追加する（iOS がセッションを保持するために必須）
-   * 2. visibilitychange で復帰時に AudioContext を resume し、スケジューラーを再同期
+   * iOS Safari では createMediaStreamDestination() が壊れているため（iOS 11〜未修正）、
+   * OfflineAudioContext で無音WAVを生成して Blob URL を <audio loop> で再生する。
+   * 実際の音声ファイルを再生する <audio> 要素だけが iOS のオーディオセッションを維持できる。
+   *
+   * 加えて：
+   * - statechange で "interrupted"（iOS 独自状態）を検知して即座に resume
+   * - visibilitychange で復帰時に resume + スケジューラー再同期
    */
-  _startBackgroundAudio() {
+  async _startBackgroundAudio() {
     if (this._bgAudio || this._silentSource) return;
     const ctx = this.audioContext;
 
-    if (typeof ctx.createMediaStreamDestination === 'function') {
-      try {
-        const dest = ctx.createMediaStreamDestination();
-        const osc  = ctx.createOscillator();
-        const gain = ctx.createGain();
-        gain.gain.value = 0.00001; // 実質無音（-100 dB 相当）
-        osc.connect(gain);
-        gain.connect(dest);
-        osc.start();
+    try {
+      // 1秒間の極小音量WAVをOfflineAudioContextで生成
+      const offCtx  = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+        1, ctx.sampleRate, ctx.sampleRate
+      );
+      const osc  = offCtx.createOscillator();
+      const gain = offCtx.createGain();
+      gain.gain.value = 0.00001; // -100dB 相当（実質無音）
+      osc.connect(gain);
+      gain.connect(offCtx.destination);
+      osc.start(0);
+      osc.stop(1);
 
-        const audio = new Audio();
-        audio.srcObject = dest.stream;
-        audio.volume    = 1;
-        audio.loop      = true;
-        // iOS がオーディオセッションを維持するために DOM に追加する（必須）
-        audio.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0.001;pointer-events:none;';
-        document.body.appendChild(audio);
+      const rendered = await offCtx.startRendering();
+      const wavBlob  = this._audioBufferToWav(rendered);
+      const blobUrl  = URL.createObjectURL(wavBlob);
 
-        const p = audio.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+      const audio = new Audio();
+      audio.src   = blobUrl;
+      audio.loop  = true;
+      audio.volume = 0.001;
+      audio.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0.001;pointer-events:none;';
+      document.body.appendChild(audio);
 
-        this._bgOsc   = osc;
-        this._bgDest  = dest;
-        this._bgAudio = audio;
+      await audio.play().catch(() => {});
 
-        // 画面ロック解除・アプリ復帰時に AudioContext を再開してスケジューラーを再同期
-        this._onVisibilityChange = () => {
-          if (document.hidden || !this.isPlaying) return;
-          const resumeCtx = this.audioContext;
-          const resync = () => {
-            // 過去に溜まった拍をスキップして現在時刻に合わせる
-            this.nextBeatTime = resumeCtx.currentTime + 0.05;
-            if (!this._timerID) this._schedule();
-          };
-          if (resumeCtx.state === 'suspended') {
-            resumeCtx.resume().then(resync);
-          } else {
-            resync();
-          }
-          // Audio 要素が停止していた場合も再生
-          if (this._bgAudio && this._bgAudio.paused) {
-            this._bgAudio.play().catch(() => {});
-          }
-        };
-        document.addEventListener('visibilitychange', this._onVisibilityChange);
-        return;
-      } catch (_) {
-        // フォールバックへ
-      }
+      this._bgAudio  = audio;
+      this._bgBlobUrl = blobUrl;
+    } catch (_) {
+      // OfflineAudioContext 未対応環境はフォールバックへ
+      const sr  = ctx.sampleRate;
+      const buf = ctx.createBuffer(1, sr, sr);
+      const d   = buf.getChannelData(0);
+      for (let i = 0; i < sr; i++) d[i] = (Math.random() * 2 - 1) * 0.00005;
+      const src  = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop   = true;
+      src.connect(ctx.destination);
+      src.start();
+      this._silentSource = src;
     }
 
-    // フォールバック: 微小振幅バッファのループ
-    const sr  = ctx.sampleRate;
-    const buf = ctx.createBuffer(1, sr, sr);
-    const d   = buf.getChannelData(0);
-    for (let i = 0; i < sr; i++) d[i] = (Math.random() * 2 - 1) * 0.00005;
-    const src  = ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop   = true;
-    src.connect(ctx.destination);
-    src.start();
-    this._silentSource = src;
+    // AudioContext の状態変化を監視（iOS の "interrupted" 対応）
+    this._onStateChange = () => {
+      if (!this.isPlaying) return;
+      const state = this.audioContext.state;
+      if (state === 'suspended' || state === 'interrupted') {
+        this.audioContext.resume().catch(() => {});
+      }
+    };
+    this.audioContext.addEventListener('statechange', this._onStateChange);
+
+    // 画面復帰時に AudioContext を再開してスケジューラーを再同期
+    this._onVisibilityChange = () => {
+      if (document.hidden || !this.isPlaying) return;
+      const resumeCtx = this.audioContext;
+      const resync = () => {
+        this.nextBeatTime = resumeCtx.currentTime + 0.05;
+        clearTimeout(this._timerID);
+        this._timerID = null;
+        this._schedule();
+      };
+      if (resumeCtx.state !== 'running') {
+        resumeCtx.resume().then(resync).catch(() => {});
+      } else {
+        resync();
+      }
+      if (this._bgAudio && this._bgAudio.paused) {
+        this._bgAudio.play().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', this._onVisibilityChange);
+  }
+
+  /**
+   * AudioBuffer → WAV Blob 変換
+   */
+  _audioBufferToWav(buffer) {
+    const numCh     = 1;
+    const sr        = buffer.sampleRate;
+    const data      = buffer.getChannelData(0);
+    const len       = data.length;
+    const arrBuf    = new ArrayBuffer(44 + len * 2);
+    const view      = new DataView(arrBuf);
+    const writeStr  = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+
+    writeStr(0,  'RIFF');
+    view.setUint32(4,  36 + len * 2, true);
+    writeStr(8,  'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1,    true); // PCM
+    view.setUint16(22, numCh, true);
+    view.setUint32(24, sr,   true);
+    view.setUint32(28, sr * 2, true);
+    view.setUint16(32, 2,    true);
+    view.setUint16(34, 16,   true);
+    writeStr(36, 'data');
+    view.setUint32(40, len * 2, true);
+    for (let i = 0; i < len; i++) {
+      view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 0x7FFF, true);
+    }
+    return new Blob([arrBuf], { type: 'audio/wav' });
   }
 
   _stopBackgroundAudio() {
+    if (this._onStateChange) {
+      this.audioContext.removeEventListener('statechange', this._onStateChange);
+      this._onStateChange = null;
+    }
     if (this._onVisibilityChange) {
       document.removeEventListener('visibilitychange', this._onVisibilityChange);
       this._onVisibilityChange = null;
     }
-    if (this._bgOsc) {
-      try { this._bgOsc.stop(); } catch (_) {}
-      this._bgOsc = null;
-    }
     if (this._bgAudio) {
       this._bgAudio.pause();
       if (this._bgAudio.parentNode) this._bgAudio.parentNode.removeChild(this._bgAudio);
-      this._bgAudio.srcObject = null;
       this._bgAudio = null;
     }
-    this._bgDest = null;
-
+    if (this._bgBlobUrl) {
+      URL.revokeObjectURL(this._bgBlobUrl);
+      this._bgBlobUrl = null;
+    }
     if (this._silentSource) {
       try { this._silentSource.stop(); } catch (_) {}
       this._silentSource = null;
