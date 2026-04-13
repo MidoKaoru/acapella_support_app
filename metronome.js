@@ -358,11 +358,20 @@ class Metronome {
     this._onVisibilityChange = () => {
       if (document.hidden || !this.isPlaying) return;
       const resumeCtx = this.audioContext;
-      const resync = () => this._resetScheduler();
+
+      // ノードはキャンセルしない（地続きで再生継続）
+      // 世代を上げてスケジューラーだけ再起動する
+      const resume = () => {
+        this._schedulerGen++;
+        clearTimeout(this._timerID);
+        this._timerID = null;
+        this._schedule();
+      };
+
       if (resumeCtx.state !== 'running') {
-        resumeCtx.resume().then(resync).catch(() => {});
+        resumeCtx.resume().then(resume).catch(() => {});
       } else {
-        resync();
+        resume();
       }
       if (this._bgAudio && this._bgAudio.paused) {
         this._bgAudio.play().catch(() => {});
