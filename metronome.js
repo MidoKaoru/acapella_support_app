@@ -33,10 +33,11 @@ class Metronome {
     this._compressor = null;
 
     // バックグラウンド再生用
-    this._bgAudio      = null;
-    this._bgOsc        = null;
-    this._bgDest       = null;
-    this._silentSource = null;
+    this._bgAudio            = null;
+    this._bgOsc              = null;
+    this._bgDest             = null;
+    this._silentSource       = null;
+    this._onVisibilityChange = null;
 
     // 拍ごとの UI コールバック（app.js からセット）
     this.onBeat = null; // (beatIndex: number) => void   -1 = 停止
@@ -134,7 +135,15 @@ class Metronome {
 
   _schedule() {
     const ctx = this.audioContext;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => this._schedule());
+      return;
+    }
+
+    // 長時間バックグラウンドから復帰した場合、過去の拍をスキップして再同期
+    if (this.nextBeatTime < ctx.currentTime - 1.0) {
+      this.nextBeatTime = ctx.currentTime + 0.05;
+    }
 
     while (this.nextBeatTime < ctx.currentTime + this._scheduleAhead) {
       this._scheduleClick(this.nextBeatTime, this.currentBeat);
@@ -167,7 +176,6 @@ class Metronome {
 
   /**
    * クリック（デフォルト）
-   * 従来より高いゲインでコンプレッサー経由出力
    */
   _soundClick(ctx, time, isAccent) {
     const out = this._getOutput();
@@ -186,7 +194,8 @@ class Metronome {
 
   /**
    * ウッドブロック
-   * ノイズ + バンドパスフィルター
+   * 短波形ピッチパイプとの同時再生でも埋もれないよう高ゲイン設定。
+   * Q を低めにして通過帯域を広げ、エネルギーを確保。
    */
   _soundWoodblock(ctx, time, isAccent) {
     const out    = this._getOutput();
@@ -202,8 +211,8 @@ class Metronome {
     src.buffer             = buf;
     filter.type            = 'bandpass';
     filter.frequency.value = isAccent ? 920 : 680;
-    filter.Q.value         = 20;
-    env.gain.setValueAtTime(isAccent ? 2.5 : 1.6, time);
+    filter.Q.value         = 8;  // 20→8：帯域を広げてエネルギー増
+    env.gain.setValueAtTime(isAccent ? 5.0 : 3.5, time);  // 2.5/1.6→5.0/3.5
     env.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
 
     src.connect(filter);
@@ -217,12 +226,11 @@ class Metronome {
    * スネアドラム風
    * ① ノイズ（スネアのカラッとした「バシッ」感）
    * ② 低音オシレーター（ドラムの胴鳴り「ドン」感）
-   * を合成して本物に近いスネア音を作る
    */
   _soundSnare(ctx, time, isAccent) {
     const out = this._getOutput();
 
-    // ① ノイズ成分（白色ノイズ + ハイパスフィルター）
+    // ① ノイズ成分
     const noiseLen  = Math.floor(ctx.sampleRate * 0.15);
     const noiseBuf  = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
     const noiseData = noiseBuf.getChannelData(0);
@@ -244,7 +252,7 @@ class Metronome {
     noiseSrc.start(time);
     noiseSrc.stop(time + 0.15);
 
-    // ② 低音成分（ピッチが急降下するオシレーター）
+    // ② 低音成分
     const bodyOsc = ctx.createOscillator();
     const bodyEnv = ctx.createGain();
 
@@ -264,11 +272,9 @@ class Metronome {
   /**
    * MediaStreamDestination + Audio 要素 方式
    *
-   * AudioContext の出力を MediaStream 経由で Audio 要素に渡す。
-   * Audio 要素が iOS のオーディオセッションを保持し続けるため、
-   * 画面ロック後も AudioContext が停止しない。
-   *
-   * 非対応環境は AudioBufferSource ループにフォールバック。
+   * ポイント：
+   * 1. Audio 要素を document.body に追加する（iOS がセッションを保持するために必須）
+   * 2. visibilitychange で復帰時に AudioContext を resume し、スケジューラーを再同期
    */
   _startBackgroundAudio() {
     if (this._bgAudio || this._silentSource) return;
@@ -284,15 +290,41 @@ class Metronome {
         gain.connect(dest);
         osc.start();
 
-        const audio     = new Audio();
+        const audio = new Audio();
         audio.srcObject = dest.stream;
         audio.volume    = 1;
+        audio.loop      = true;
+        // iOS がオーディオセッションを維持するために DOM に追加する（必須）
+        audio.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0.001;pointer-events:none;';
+        document.body.appendChild(audio);
+
         const p = audio.play();
         if (p && typeof p.catch === 'function') p.catch(() => {});
 
         this._bgOsc   = osc;
         this._bgDest  = dest;
         this._bgAudio = audio;
+
+        // 画面ロック解除・アプリ復帰時に AudioContext を再開してスケジューラーを再同期
+        this._onVisibilityChange = () => {
+          if (document.hidden || !this.isPlaying) return;
+          const resumeCtx = this.audioContext;
+          const resync = () => {
+            // 過去に溜まった拍をスキップして現在時刻に合わせる
+            this.nextBeatTime = resumeCtx.currentTime + 0.05;
+            if (!this._timerID) this._schedule();
+          };
+          if (resumeCtx.state === 'suspended') {
+            resumeCtx.resume().then(resync);
+          } else {
+            resync();
+          }
+          // Audio 要素が停止していた場合も再生
+          if (this._bgAudio && this._bgAudio.paused) {
+            this._bgAudio.play().catch(() => {});
+          }
+        };
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
         return;
       } catch (_) {
         // フォールバックへ
@@ -313,12 +345,17 @@ class Metronome {
   }
 
   _stopBackgroundAudio() {
+    if (this._onVisibilityChange) {
+      document.removeEventListener('visibilitychange', this._onVisibilityChange);
+      this._onVisibilityChange = null;
+    }
     if (this._bgOsc) {
       try { this._bgOsc.stop(); } catch (_) {}
       this._bgOsc = null;
     }
     if (this._bgAudio) {
       this._bgAudio.pause();
+      if (this._bgAudio.parentNode) this._bgAudio.parentNode.removeChild(this._bgAudio);
       this._bgAudio.srcObject = null;
       this._bgAudio = null;
     }
