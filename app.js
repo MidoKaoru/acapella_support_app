@@ -171,6 +171,16 @@ function initMetronome() {
     });
   });
 
+  // 裏拍設定
+  document.querySelectorAll('#subdivision-type .segment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subdivision-type .segment-btn')
+        .forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      metronome.setSubdivisionType(btn.dataset.sub);
+    });
+  });
+
   // クリック音選択
   document.querySelectorAll('#metro-sound-type .segment-btn').forEach(btn => {
     btn.addEventListener('click', () => {

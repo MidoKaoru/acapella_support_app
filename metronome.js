@@ -14,7 +14,8 @@ class Metronome {
     this.beatsPerMeasure = 4;
     this.currentBeat     = 0;
     this.nextBeatTime    = 0;
-    this.soundType       = 'click';
+    this.soundType        = 'click';
+    this.subdivisionType  = 'none'; // 'none' | 'straight' | 'shuffle'
 
     this._lookaheadMs   = 25;
     this._scheduleAhead = 5.0; // 5秒先読み：スイッチ・スリープ時のビート枯渇を防ぐ
@@ -59,6 +60,11 @@ class Metronome {
 
   setSoundType(type) {
     this.soundType = type;
+    if (this.isPlaying && this.audioContext) this._resetScheduler();
+  }
+
+  setSubdivisionType(type) {
+    this.subdivisionType = type;
     if (this.isPlaying && this.audioContext) this._resetScheduler();
   }
 
@@ -185,10 +191,24 @@ class Metronome {
     const ctx      = this.audioContext;
     const isAccent = beat === 0;
 
+    // メインビート
     switch (this.soundType) {
       case 'woodblock': this._soundWoodblock(ctx, time, isAccent); break;
       case 'snare':     this._soundSnare(ctx, time, isAccent);     break;
       default:          this._soundClick(ctx, time, isAccent);     break;
+    }
+
+    // 裏拍（サブディビジョン）
+    if (this.subdivisionType !== 'none') {
+      const offset = this.subdivisionType === 'shuffle'
+        ? this._secondsPerBeat * (2 / 3)  // 三連符の3拍目
+        : this._secondsPerBeat * 0.5;     // 8分音符
+      const subTime = time + offset;
+      switch (this.soundType) {
+        case 'woodblock': this._soundWoodblock(ctx, subTime, false, 0.45); break;
+        case 'snare':     this._soundSnare(ctx, subTime, false, 0.45);     break;
+        default:          this._soundClick(ctx, subTime, false, 0.45);     break;
+      }
     }
 
     const gen     = this._schedulerGen;
@@ -202,13 +222,13 @@ class Metronome {
 
   // ─── 音生成（全ノードを _scheduledNodes に登録） ─
 
-  _soundClick(ctx, time, isAccent) {
+  _soundClick(ctx, time, isAccent, gainMul = 1.0) {
     const out = this._getOutput();
     const osc = ctx.createOscillator();
     const env = ctx.createGain();
 
     osc.frequency.value = isAccent ? 1050 : 800;
-    env.gain.setValueAtTime(isAccent ? 2.0 : 1.3, time);
+    env.gain.setValueAtTime((isAccent ? 2.0 : 1.3) * gainMul, time);
     env.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
 
     osc.connect(env);
@@ -223,7 +243,7 @@ class Metronome {
     };
   }
 
-  _soundWoodblock(ctx, time, isAccent) {
+  _soundWoodblock(ctx, time, isAccent, gainMul = 1.0) {
     const out    = this._getOutput();
     const bufLen = Math.floor(ctx.sampleRate * 0.08);
     const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
@@ -238,7 +258,7 @@ class Metronome {
     filter.type            = 'bandpass';
     filter.frequency.value = isAccent ? 920 : 680;
     filter.Q.value         = 8;
-    env.gain.setValueAtTime(isAccent ? 5.0 : 3.5, time);
+    env.gain.setValueAtTime((isAccent ? 5.0 : 3.5) * gainMul, time);
     env.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
 
     src.connect(filter);
@@ -254,7 +274,7 @@ class Metronome {
     };
   }
 
-  _soundSnare(ctx, time, isAccent) {
+  _soundSnare(ctx, time, isAccent, gainMul = 1.0) {
     const out = this._getOutput();
 
     const noiseLen  = Math.floor(ctx.sampleRate * 0.15);
@@ -269,7 +289,7 @@ class Metronome {
     noiseSrc.buffer        = noiseBuf;
     hipass.type            = 'highpass';
     hipass.frequency.value = 2000;
-    noiseEnv.gain.setValueAtTime(isAccent ? 2.2 : 1.4, time);
+    noiseEnv.gain.setValueAtTime((isAccent ? 2.2 : 1.4) * gainMul, time);
     noiseEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
 
     noiseSrc.connect(hipass);
@@ -283,7 +303,7 @@ class Metronome {
 
     bodyOsc.frequency.setValueAtTime(isAccent ? 220 : 160, time);
     bodyOsc.frequency.exponentialRampToValueAtTime(55, time + 0.07);
-    bodyEnv.gain.setValueAtTime(isAccent ? 1.8 : 1.1, time);
+    bodyEnv.gain.setValueAtTime((isAccent ? 1.8 : 1.1) * gainMul, time);
     bodyEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
 
     bodyOsc.connect(bodyEnv);
