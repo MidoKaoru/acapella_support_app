@@ -152,21 +152,20 @@ class Metronome {
    */
   _muteAndReschedule() {
     const ctx = this.audioContext;
+
+    // 世代番号を上げる：古い _schedule() の setTimeout が世代違いで即リターンする
+    this._schedulerGen++;
     clearTimeout(this._timerID);
     this._timerID = null;
 
-    // 世代番号を上げて古い onBeat コールバックを無効化
-    this._schedulerGen++;
-
     if (this._masterGain) {
-      // 既存スケジュール音を 50ms かけてフェードアウト
+      // 即時ミュート → 50ms 後に音量を戻す（フェードではなく瞬時切替）
       this._masterGain.gain.cancelScheduledValues(ctx.currentTime);
-      this._masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.008);
-      // 60ms 後に音量を戻して新しいビートから再生
-      this._masterGain.gain.setValueAtTime(1, ctx.currentTime + 0.06);
+      this._masterGain.gain.setValueAtTime(0, ctx.currentTime);
+      this._masterGain.gain.setValueAtTime(1, ctx.currentTime + 0.05);
     }
 
-    this.nextBeatTime = ctx.currentTime + 0.07;
+    this.nextBeatTime = ctx.currentTime + 0.06;
     this._schedule();
   }
 
@@ -204,9 +203,15 @@ class Metronome {
   // ─── 内部: スケジューラー ────────────────────
 
   _schedule() {
+    // 世代チェック：_muteAndReschedule や visibilitychange で世代が進んでいたら
+    // この _schedule() は古い呼び出しなので即リターンする
+    const gen = this._schedulerGen;
+
     const ctx = this.audioContext;
     if (ctx.state === 'suspended') {
-      ctx.resume().then(() => this._schedule());
+      ctx.resume().then(() => {
+        if (this.isPlaying && this._schedulerGen === gen) this._schedule();
+      });
       return;
     }
 
@@ -222,7 +227,7 @@ class Metronome {
     }
 
     this._timerID = setTimeout(() => {
-      if (this.isPlaying) this._schedule();
+      if (this.isPlaying && this._schedulerGen === gen) this._schedule();
     }, this._lookaheadMs);
   }
 
@@ -401,21 +406,8 @@ class Metronome {
       if (document.hidden || !this.isPlaying) return;
       const resumeCtx = this.audioContext;
       const resync = () => {
-        clearTimeout(this._timerID);
-        this._timerID = null;
-
-        // 世代番号を上げて古い onBeat コールバックを無効化
-        this._schedulerGen++;
-
-        // バックグラウンド中に溜まったスケジュール済み音を消音してから再開
-        if (this._masterGain) {
-          this._masterGain.gain.cancelScheduledValues(resumeCtx.currentTime);
-          this._masterGain.gain.setTargetAtTime(0, resumeCtx.currentTime, 0.005);
-          this._masterGain.gain.setValueAtTime(1, resumeCtx.currentTime + 0.05);
-        }
-
-        this.nextBeatTime = resumeCtx.currentTime + 0.06;
-        this._schedule();
+        // _muteAndReschedule と同じパターンで世代を上げてリセット
+        this._muteAndReschedule();
       };
       if (resumeCtx.state !== 'running') {
         resumeCtx.resume().then(resync).catch(() => {});
