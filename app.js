@@ -111,11 +111,12 @@ function initPitchPipe() {
 
 // ─── メトロノーム UI ─────────────────────────
 function initMetronome() {
-  const bpmInput      = document.getElementById('bpm-input');
-  const bpmSlider     = document.getElementById('bpm-slider');
-  const bottomBpm     = document.getElementById('bottom-bpm');
-  const metroToggle   = document.getElementById('metro-toggle');
-  const beatIndicator = document.getElementById('beat-indicator');
+  const bpmInput        = document.getElementById('bpm-input');
+  const bpmSlider       = document.getElementById('bpm-slider');
+  const bottomBpm       = document.getElementById('bottom-bpm');
+  const metroToggle     = document.getElementById('metro-toggle');
+  const metroToggleLabel = document.getElementById('metro-toggle-label');
+  const beatIndicator   = document.getElementById('beat-indicator');
 
   // BPM 表示を一括更新
   function applyBPM(value) {
@@ -191,13 +192,13 @@ function initMetronome() {
   metroToggle.addEventListener('click', () => {
     if (metronome.isPlaying) {
       metronome.stop();
-      metroToggle.textContent = '▶ スタート';
+      metroToggleLabel.textContent = 'スタート';
       metroToggle.classList.remove('playing');
     } else {
       const ctx = getAudioContext();
       metronome.setAudioContext(ctx);
       metronome.start();
-      metroToggle.textContent = '■ ストップ';
+      metroToggleLabel.textContent = 'ストップ';
       metroToggle.classList.add('playing');
     }
   });
@@ -213,9 +214,8 @@ function initGlobalStop() {
     // メトロノーム停止
     if (metronome.isPlaying) {
       metronome.stop();
-      const toggle = document.getElementById('metro-toggle');
-      toggle.textContent = '▶ スタート';
-      toggle.classList.remove('playing');
+      metroToggleLabel.textContent = 'スタート';
+      metroToggle.classList.remove('playing');
     }
 
     // ピッチパイプ全音停止

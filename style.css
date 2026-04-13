@@ -446,25 +446,40 @@ input[type="range"]::-webkit-slider-thumb {
   color: white;
 }
 
-/* スタート / ストップ */
+/* メトロノームグループ（BPM表示 + スタートボタン） */
+.metro-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* スタート / ストップ（共通コントローラー内） */
 .metro-toggle-btn {
-  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   background: var(--primary);
   color: white;
-  border-radius: 14px;
-  padding: 16px;
-  font-size: 17px;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 13px;
   font-weight: 700;
-  min-height: 60px;
+  height: 44px;
   transition: background 0.15s;
-  box-shadow: 0 4px 14px rgba(94, 92, 230, 0.35);
+  box-shadow: 0 2px 8px rgba(94, 92, 230, 0.35);
   letter-spacing: 0.2px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .metro-toggle-btn.playing {
   background: var(--danger);
-  box-shadow: 0 4px 14px rgba(255, 59, 48, 0.35);
+  box-shadow: 0 2px 8px rgba(255, 59, 48, 0.35);
+}
+
+.metro-btn-icon {
+  flex-shrink: 0;
 }
 
 /* ===== 共通コントローラー ===== */

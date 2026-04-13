@@ -145,9 +145,6 @@
         <button class="tap-btn" id="tap-btn" aria-label="タップテンポ">
           タップテンポ
         </button>
-
-        <!-- スタート / ストップ -->
-        <button class="metro-toggle-btn" id="metro-toggle">▶ スタート</button>
       </div>
     </section>
 
@@ -155,9 +152,21 @@
 
   <!-- ===== 共通コントローラー（画面下部固定） ===== -->
   <div class="common-controller" role="region" aria-label="共通コントローラー">
-    <div class="bpm-info">
-      <span class="bpm-label">BPM</span>
-      <span class="bpm-value" id="bottom-bpm">120</span>
+    <div class="metro-group">
+      <div class="bpm-info">
+        <span class="bpm-label">BPM</span>
+        <span class="bpm-value" id="bottom-bpm">120</span>
+      </div>
+      <button class="metro-toggle-btn" id="metro-toggle" aria-label="メトロノーム スタート/ストップ">
+        <svg class="metro-btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+          aria-hidden="true">
+          <polygon points="6,22 18,22 14,3 10,3"/>
+          <line x1="12" y1="20" x2="16.5" y2="9"/>
+          <circle cx="16" cy="9.5" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+        <span id="metro-toggle-label">スタート</span>
+      </button>
     </div>
     <button class="global-stop-btn" id="global-stop" aria-label="全停止">
       ■ 全停止
