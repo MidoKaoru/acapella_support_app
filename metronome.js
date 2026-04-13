@@ -17,7 +17,7 @@ class Metronome {
     this.soundType       = 'click';
 
     this._lookaheadMs   = 25;
-    this._scheduleAhead = 3.0;
+    this._scheduleAhead = 5.0; // 5秒先読み：スイッチ・スリープ時のビート枯渇を防ぐ
     this._timerID       = null;
     this._schedulerGen  = 0;
 
@@ -368,11 +368,10 @@ class Metronome {
         this._schedule();
       };
 
-      if (resumeCtx.state !== 'running') {
-        resumeCtx.resume().then(resume).catch(() => {});
-      } else {
-        resume();
-      }
+      // resume() の完了を待たずに即時呼ぶ。
+      // AudioContext がまだ suspended でも _schedule() 内部で再試行するため安全。
+      if (resumeCtx.state !== 'running') resumeCtx.resume().catch(() => {});
+      resume();
       if (this._bgAudio && this._bgAudio.paused) {
         this._bgAudio.play().catch(() => {});
       }
