@@ -4,8 +4,9 @@
  * - Web Audio API ルックアヘッドスケジューリング（精度優先）
  * - 1拍目アクセント音
  * - タップテンポ
- * - クリック音3種類：クリック / ウッドブロック / ベル
- * - バックグラウンド再生：MediaStreamDestination + Audio要素（iOS対応）
+ * - クリック音3種類：クリック / ウッドブロック / スネア
+ * - DynamicsCompressor でクリック音をピッチパイプ音に埋もれにくくする
+ * - バックグラウンド再生：MediaStreamDestination + Audio 要素（iOS 対応）
  * - Media Session API（ロック画面から操作）
  */
 
@@ -18,21 +19,24 @@ class Metronome {
     this.beatsPerMeasure = 4;
     this.currentBeat     = 0;
     this.nextBeatTime    = 0;
-    this.soundType       = 'click'; // 'click' | 'woodblock' | 'bell'
+    this.soundType       = 'click'; // 'click' | 'woodblock' | 'snare'
 
     // スケジューラー設定
-    this._lookaheadMs   = 25;   // setInterval 間隔 (ms)
+    this._lookaheadMs   = 25;   // setTimeout 間隔 (ms)
     this._scheduleAhead = 0.12; // 先読み時間 (秒)
     this._timerID       = null;
 
     // タップテンポ
     this._tapTimes = [];
 
+    // メトロノーム出力用コンプレッサー（クリック音を際立たせる）
+    this._compressor = null;
+
     // バックグラウンド再生用
-    this._bgAudio      = null; // Audio 要素
-    this._bgOsc        = null; // 無音 OscillatorNode
-    this._bgDest       = null; // MediaStreamDestination
-    this._silentSource = null; // フォールバック用 BufferSource
+    this._bgAudio      = null;
+    this._bgOsc        = null;
+    this._bgDest       = null;
+    this._silentSource = null;
 
     // 拍ごとの UI コールバック（app.js からセット）
     this.onBeat = null; // (beatIndex: number) => void   -1 = 停止
@@ -41,6 +45,7 @@ class Metronome {
   /** app.js から共有 AudioContext を注入 */
   setAudioContext(ctx) {
     this.audioContext = ctx;
+    this._compressor  = null; // コンテキスト変更時にリセット
   }
 
   get _secondsPerBeat() {
@@ -86,18 +91,13 @@ class Metronome {
       navigator.mediaSession.playbackState = 'none';
     }
 
-    if (this.onBeat) this.onBeat(-1); // UI をリセット
+    if (this.onBeat) this.onBeat(-1);
   }
 
-  /**
-   * タップテンポ
-   * @returns {number|null} 算出 BPM（tap が1回のみなら null）
-   */
   tapTempo() {
     const now = Date.now();
     this._tapTimes = this._tapTimes.filter(t => now - t < 3000);
     this._tapTimes.push(now);
-
     if (this._tapTimes.length < 2) return null;
 
     const intervals = [];
@@ -106,6 +106,28 @@ class Metronome {
     }
     const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     return Math.max(20, Math.min(300, Math.round(60000 / avg)));
+  }
+
+  // ─── 内部: コンプレッサー（クリック音強化） ──
+
+  /**
+   * メトロノーム専用の出力ノードを返す。
+   * DynamicsCompressor を挟むことで、ゲインを高めても歪まず
+   * ピッチパイプ音と同時再生しても埋もれにくくなる。
+   */
+  _getOutput() {
+    const ctx = this.audioContext;
+    if (!this._compressor) {
+      const comp          = ctx.createDynamicsCompressor();
+      comp.threshold.value = -6;   // dB: この音量以上を圧縮
+      comp.knee.value      = 4;    // dB: 緩やかに圧縮を開始
+      comp.ratio.value     = 10;   // 圧縮率：超えた分を1/10に
+      comp.attack.value    = 0.001; // 秒: 瞬時に反応
+      comp.release.value   = 0.05; // 秒: すぐに戻す
+      comp.connect(ctx.destination);
+      this._compressor = comp;
+    }
+    return this._compressor;
   }
 
   // ─── 内部: スケジューラー ────────────────────
@@ -125,18 +147,16 @@ class Metronome {
     }, this._lookaheadMs);
   }
 
-  /** 音種ごとにクリック音をスケジュール */
   _scheduleClick(time, beat) {
     const ctx      = this.audioContext;
     const isAccent = beat === 0;
 
     switch (this.soundType) {
       case 'woodblock': this._soundWoodblock(ctx, time, isAccent); break;
-      case 'bell':      this._soundBell(ctx, time, isAccent);      break;
+      case 'snare':     this._soundSnare(ctx, time, isAccent);     break;
       default:          this._soundClick(ctx, time, isAccent);     break;
     }
 
-    // UI 更新タイマー（オーディオ再生と同期）
     const delayMs = Math.max(0, (time - ctx.currentTime) * 1000);
     setTimeout(() => {
       if (this.isPlaying && this.onBeat) this.onBeat(beat);
@@ -145,21 +165,31 @@ class Metronome {
 
   // ─── 音種ごとの音生成 ─────────────────────────
 
-  /** クリック（デフォルト）: 矩形的な短い音 */
+  /**
+   * クリック（デフォルト）
+   * 従来より高いゲインでコンプレッサー経由出力
+   */
   _soundClick(ctx, time, isAccent) {
+    const out = this._getOutput();
     const osc = ctx.createOscillator();
     const env = ctx.createGain();
+
     osc.frequency.value = isAccent ? 1050 : 800;
-    env.gain.setValueAtTime(isAccent ? 0.75 : 0.45, time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+    env.gain.setValueAtTime(isAccent ? 2.0 : 1.3, time);
+    env.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+
     osc.connect(env);
-    env.connect(ctx.destination);
+    env.connect(out);
     osc.start(time);
     osc.stop(time + 0.06);
   }
 
-  /** ウッドブロック: ノイズ + バンドパスフィルター */
+  /**
+   * ウッドブロック
+   * ノイズ + バンドパスフィルター
+   */
   _soundWoodblock(ctx, time, isAccent) {
+    const out    = this._getOutput();
     const bufLen = Math.floor(ctx.sampleRate * 0.08);
     const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
     const data   = buf.getChannelData(0);
@@ -169,53 +199,76 @@ class Metronome {
     const filter = ctx.createBiquadFilter();
     const env    = ctx.createGain();
 
-    src.buffer         = buf;
-    filter.type        = 'bandpass';
+    src.buffer             = buf;
+    filter.type            = 'bandpass';
     filter.frequency.value = isAccent ? 920 : 680;
-    filter.Q.value     = 20;
-
-    env.gain.setValueAtTime(isAccent ? 1.3 : 0.85, time);
+    filter.Q.value         = 20;
+    env.gain.setValueAtTime(isAccent ? 2.5 : 1.6, time);
     env.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
 
     src.connect(filter);
     filter.connect(env);
-    env.connect(ctx.destination);
+    env.connect(out);
     src.start(time);
     src.stop(time + 0.09);
   }
 
-  /** ベル: サイン波の倍音 + 長めの余韻 */
-  _soundBell(ctx, time, isAccent) {
-    const baseFreqs = isAccent ? [880, 1320, 2200] : [660, 990, 1650];
-    const gainBase  = isAccent ? 0.38 : 0.24;
-    const decay     = isAccent ? 0.55 : 0.38;
+  /**
+   * スネアドラム風
+   * ① ノイズ（スネアのカラッとした「バシッ」感）
+   * ② 低音オシレーター（ドラムの胴鳴り「ドン」感）
+   * を合成して本物に近いスネア音を作る
+   */
+  _soundSnare(ctx, time, isAccent) {
+    const out = this._getOutput();
 
-    baseFreqs.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type           = 'sine';
-      osc.frequency.value = freq;
-      env.gain.setValueAtTime(gainBase / (i + 1), time);
-      env.gain.exponentialRampToValueAtTime(0.001, time + decay);
-      osc.connect(env);
-      env.connect(ctx.destination);
-      osc.start(time);
-      osc.stop(time + decay + 0.05);
-    });
+    // ① ノイズ成分（白色ノイズ + ハイパスフィルター）
+    const noiseLen  = Math.floor(ctx.sampleRate * 0.15);
+    const noiseBuf  = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+    const noiseData = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) noiseData[i] = Math.random() * 2 - 1;
+
+    const noiseSrc = ctx.createBufferSource();
+    const hipass   = ctx.createBiquadFilter();
+    const noiseEnv = ctx.createGain();
+
+    noiseSrc.buffer        = noiseBuf;
+    hipass.type            = 'highpass';
+    hipass.frequency.value = 2000;
+    noiseEnv.gain.setValueAtTime(isAccent ? 2.2 : 1.4, time);
+    noiseEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+
+    noiseSrc.connect(hipass);
+    hipass.connect(noiseEnv);
+    noiseEnv.connect(out);
+    noiseSrc.start(time);
+    noiseSrc.stop(time + 0.15);
+
+    // ② 低音成分（ピッチが急降下するオシレーター）
+    const bodyOsc = ctx.createOscillator();
+    const bodyEnv = ctx.createGain();
+
+    bodyOsc.frequency.setValueAtTime(isAccent ? 220 : 160, time);
+    bodyOsc.frequency.exponentialRampToValueAtTime(55, time + 0.07);
+    bodyEnv.gain.setValueAtTime(isAccent ? 1.8 : 1.1, time);
+    bodyEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+
+    bodyOsc.connect(bodyEnv);
+    bodyEnv.connect(out);
+    bodyOsc.start(time);
+    bodyOsc.stop(time + 0.1);
   }
 
-  // ─── 内部: バックグラウンド再生 ─────────────
+  // ─── 内部: バックグラウンド再生（iOS 対応） ──
 
   /**
-   * iOS Safari でスリープ中も AudioContext を維持する
+   * MediaStreamDestination + Audio 要素 方式
    *
-   * 方式①（推奨）: MediaStreamDestination + Audio 要素
-   *   AudioContext の出力を MediaStream 経由で Audio 要素に流す。
-   *   Audio 要素が iOS のオーディオセッションを保持し続けるため
-   *   画面ロック後もメトロノームが鳴り続ける。
+   * AudioContext の出力を MediaStream 経由で Audio 要素に渡す。
+   * Audio 要素が iOS のオーディオセッションを保持し続けるため、
+   * 画面ロック後も AudioContext が停止しない。
    *
-   * 方式②（フォールバック）: AudioBufferSource ループ
-   *   MediaStreamDestination が使えない環境向け。
+   * 非対応環境は AudioBufferSource ループにフォールバック。
    */
   _startBackgroundAudio() {
     if (this._bgAudio || this._silentSource) return;
@@ -224,19 +277,16 @@ class Metronome {
     if (typeof ctx.createMediaStreamDestination === 'function') {
       try {
         const dest = ctx.createMediaStreamDestination();
-
-        // 実質無音の発振器でストリームを「空でない」状態にする
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
-        gain.gain.value = 0.00001; // -100dB 相当、聴こえない
+        gain.gain.value = 0.00001; // 実質無音（-100 dB 相当）
         osc.connect(gain);
         gain.connect(dest);
         osc.start();
 
-        // Audio 要素でストリームを再生 → iOS オーディオセッション確保
-        const audio      = new Audio();
-        audio.srcObject  = dest.stream;
-        audio.volume     = 1;
+        const audio     = new Audio();
+        audio.srcObject = dest.stream;
+        audio.volume    = 1;
         const p = audio.play();
         if (p && typeof p.catch === 'function') p.catch(() => {});
 
@@ -249,7 +299,7 @@ class Metronome {
       }
     }
 
-    // フォールバック: 微小振幅バッファのループ再生
+    // フォールバック: 微小振幅バッファのループ
     const sr  = ctx.sampleRate;
     const buf = ctx.createBuffer(1, sr, sr);
     const d   = buf.getChannelData(0);
@@ -280,7 +330,8 @@ class Metronome {
     }
   }
 
-  /** Media Session API — ロック画面からの操作を受け付ける */
+  // ─── Media Session API ───────────────────────
+
   _setupMediaSession() {
     if (!('mediaSession' in navigator)) return;
 
