@@ -365,6 +365,19 @@ class Metronome {
         this._schedulerGen++;
         clearTimeout(this._timerID);
         this._timerID = null;
+
+        // 現在鳴っているビートを逆算して即座にライトを点灯する。
+        // nextBeatTime/currentBeat から「今の位置」を求める：
+        //   nextBeatTime から k 個前のビート（k = ceil((nextBeatTime - now) / spb)）
+        //   が now 以前に最も近い既スケジュール済みビート。
+        const ctx = this.audioContext;
+        const now = ctx.currentTime;
+        if (this.onBeat && this.nextBeatTime > now) {
+          const k = Math.ceil((this.nextBeatTime - now) / this._secondsPerBeat);
+          const beatIdx = (this.currentBeat - k + this.beatsPerMeasure * 1000) % this.beatsPerMeasure;
+          this.onBeat(beatIdx);
+        }
+
         this._schedule();
       };
 
