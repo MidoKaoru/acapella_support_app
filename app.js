@@ -171,16 +171,6 @@ function initMetronome() {
     });
   });
 
-  // 裏拍設定
-  document.querySelectorAll('#subdivision-type .segment-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#subdivision-type .segment-btn')
-        .forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      metronome.setSubdivisionType(btn.dataset.sub);
-    });
-  });
-
   // クリック音選択
   document.querySelectorAll('#metro-sound-type .segment-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -218,6 +208,148 @@ function initMetronome() {
   applyBPM(120);
 }
 
+// ─── リズムタブ ──────────────────────────────
+function initRhythm() {
+  const DIVISIONS = 12;
+  const SVG_NS    = 'http://www.w3.org/2000/svg';
+  const CX = 110, CY = 110, R_OUTER = 90, R_DOT = 11, R_INNER_DOT = 7;
+
+  // プリセット定義（0=12時=表拍は含まない）
+  const PRESETS = {
+    none:            [],
+    straight8:       [6],
+    sixteenth:       [3, 6, 9],
+    shuffle:         [8],
+    halftimeShuffle: [2, 3, 5, 6, 8, 9, 11],
+  };
+
+  // 現在のステップ状態（0は常にtrue）
+  const steps = new Array(DIVISIONS).fill(false);
+  steps[0] = true;
+
+  const svg = document.getElementById('rhythm-clock');
+
+  // ── SVGを構築 ──────────────────────────────
+  function buildClock() {
+    svg.innerHTML = '';
+
+    // 外周リング
+    const ring = document.createElementNS(SVG_NS, 'circle');
+    ring.setAttribute('cx', CX); ring.setAttribute('cy', CY);
+    ring.setAttribute('r', R_OUTER);
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', 'var(--border)');
+    ring.setAttribute('stroke-width', '2');
+    svg.appendChild(ring);
+
+    for (let i = 0; i < DIVISIONS; i++) {
+      const angle = (i / DIVISIONS) * 2 * Math.PI - Math.PI / 2; // 12時スタート
+      const x = CX + R_OUTER * Math.cos(angle);
+      const y = CY + R_OUTER * Math.sin(angle);
+
+      // ドット本体
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('cx', x);
+      circle.setAttribute('cy', y);
+      circle.dataset.step = i;
+      circle.classList.add('rhythm-dot');
+      updateDotStyle(circle, i);
+      svg.appendChild(circle);
+
+      // タップ領域（ドットより広い透明な円）
+      const hit = document.createElementNS(SVG_NS, 'circle');
+      hit.setAttribute('cx', x);
+      hit.setAttribute('cy', y);
+      hit.setAttribute('r', '18');
+      hit.setAttribute('fill', 'transparent');
+      hit.dataset.step = i;
+      hit.addEventListener('click', onDotClick);
+      svg.appendChild(hit);
+    }
+
+    // 中心ラベル
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', CX); label.setAttribute('y', CY + 5);
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('font-size', '12');
+    label.setAttribute('fill', 'var(--text-secondary)');
+    label.setAttribute('font-family', '-apple-system, sans-serif');
+    label.textContent = '1拍';
+    svg.appendChild(label);
+  }
+
+  function updateDotStyle(circle, i) {
+    const isOn = steps[i];
+    const isRoot = i === 0;
+    const r = isOn ? R_DOT : R_INNER_DOT;
+    circle.setAttribute('r', r);
+    if (isRoot) {
+      circle.setAttribute('fill', 'var(--primary)');
+      circle.setAttribute('stroke', 'var(--primary)');
+      circle.setAttribute('stroke-width', '2');
+    } else if (isOn) {
+      circle.setAttribute('fill', 'var(--primary)');
+      circle.setAttribute('stroke', 'var(--primary)');
+      circle.setAttribute('stroke-width', '2');
+    } else {
+      circle.setAttribute('fill', 'var(--surface)');
+      circle.setAttribute('stroke', 'var(--border)');
+      circle.setAttribute('stroke-width', '2');
+    }
+  }
+
+  function refreshDots() {
+    svg.querySelectorAll('.rhythm-dot').forEach(c => {
+      updateDotStyle(c, parseInt(c.dataset.step));
+    });
+  }
+
+  function onDotClick(e) {
+    const i = parseInt(e.currentTarget.dataset.step);
+    if (i === 0) return; // 表拍は変更不可
+    steps[i] = !steps[i];
+    refreshDots();
+    applyToMetronome();
+    syncPresetButtons();
+  }
+
+  function applyToMetronome() {
+    const active = [];
+    for (let i = 1; i < DIVISIONS; i++) {
+      if (steps[i]) active.push(i);
+    }
+    metronome.setSubdivisionSteps(active);
+  }
+
+  function syncPresetButtons() {
+    const activeSteps = JSON.stringify(
+      Array.from({length: DIVISIONS}, (_, i) => i).filter(i => i > 0 && steps[i]).sort((a,b)=>a-b)
+    );
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      const presetSteps = JSON.stringify([...(PRESETS[btn.dataset.preset] || [])].sort((a,b)=>a-b));
+      btn.classList.toggle('active', presetSteps === activeSteps);
+    });
+  }
+
+  function applyPreset(name) {
+    const preset = PRESETS[name] ?? [];
+    for (let i = 1; i < DIVISIONS; i++) steps[i] = preset.includes(i);
+    refreshDots();
+    applyToMetronome();
+  }
+
+  // ── プリセットボタン ──────────────────────
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyPreset(btn.dataset.preset);
+    });
+  });
+
+  buildClock();
+}
+
 // ─── 全停止ボタン ────────────────────────────
 function initGlobalStop() {
   document.getElementById('global-stop').addEventListener('click', () => {
@@ -250,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initPitchPipe();
   initMetronome();
+  initRhythm();
   initGlobalStop();
   registerSW();
 });

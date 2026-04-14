@@ -33,6 +33,19 @@
       </span>
       <span class="tab-label">メトロノーム</span>
     </button>
+    <button class="tab-btn" data-tab="rhythm" role="tab" aria-selected="false">
+      <span class="tab-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+          <line x1="12" y1="3" x2="12" y2="6"/>
+          <line x1="12" y1="18" x2="12" y2="21"/>
+          <line x1="3" y1="12" x2="6" y2="12"/>
+          <line x1="18" y1="12" x2="21" y2="12"/>
+        </svg>
+      </span>
+      <span class="tab-label">リズム</span>
+    </button>
   </nav>
 
   <!-- ===== タブコンテンツ ===== -->
@@ -130,16 +143,6 @@
             class="bpm-slider" aria-label="BPMスライダー">
         </div>
 
-        <!-- 裏拍設定 -->
-        <div class="card control-group">
-          <span class="control-label">裏拍</span>
-          <div class="segment-control" id="subdivision-type" role="group" aria-label="裏拍設定">
-            <button class="segment-btn active" data-sub="none">なし</button>
-            <button class="segment-btn" data-sub="straight">8分音符</button>
-            <button class="segment-btn" data-sub="shuffle">シャッフル</button>
-          </div>
-        </div>
-
         <!-- 拍子選択 -->
         <div class="card control-group">
           <span class="control-label">拍子</span>
@@ -155,6 +158,37 @@
         <button class="tap-btn" id="tap-btn" aria-label="タップテンポ">
           タップテンポ
         </button>
+      </div>
+    </section>
+
+    <!-- リズム -->
+    <section id="tab-rhythm" class="tab-panel" role="tabpanel">
+      <div class="panel-content">
+
+        <!-- プリセット -->
+        <div class="card control-group">
+          <span class="control-label">プリセット</span>
+          <div class="rhythm-presets">
+            <button class="preset-btn active" data-preset="none">なし</button>
+            <button class="preset-btn" data-preset="straight8">8分音符</button>
+            <button class="preset-btn" data-preset="sixteenth">16分音符</button>
+            <button class="preset-btn" data-preset="shuffle">シャッフル</button>
+            <button class="preset-btn" data-preset="halftimeShuffle">ハーフタイム<br>シャッフル</button>
+          </div>
+        </div>
+
+        <!-- 円形エディタ -->
+        <div class="card rhythm-editor-card">
+          <span class="control-label">カスタム（タップで ON / OFF）</span>
+          <div class="rhythm-clock-wrap">
+            <svg id="rhythm-clock" class="rhythm-clock" viewBox="0 0 220 220"
+              aria-label="リズム円形エディタ" role="group">
+              <!-- JS で生成 -->
+            </svg>
+          </div>
+          <p class="rhythm-clock-hint">12時 = 表拍（常時ON）</p>
+        </div>
+
       </div>
     </section>
 

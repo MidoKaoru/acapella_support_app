@@ -14,8 +14,11 @@ class Metronome {
     this.beatsPerMeasure = 4;
     this.currentBeat     = 0;
     this.nextBeatTime    = 0;
-    this.soundType        = 'click';
-    this.subdivisionType  = 'none'; // 'none' | 'straight' | 'shuffle'
+    this.soundType       = 'click';
+    // 12等分の裏拍パターン。各要素は 0〜11 のステップ番号。
+    // 0（12時）= 表拍で常にON（このリストには含まず別途鳴らす）。
+    // 例: [6] = 8分裏、[3,6,9] = 16分、[8] = シャッフル
+    this.subdivisionSteps = []; // 0〜11 のうち表拍(0)以外でONにするステップ
 
     this._lookaheadMs   = 25;
     this._scheduleAhead = 5.0; // 5秒先読み：スイッチ・スリープ時のビート枯渇を防ぐ
@@ -63,8 +66,9 @@ class Metronome {
     if (this.isPlaying && this.audioContext) this._resetScheduler();
   }
 
-  setSubdivisionType(type) {
-    this.subdivisionType = type;
+  /** 裏拍ステップを設定（0〜11、0=表拍は除く）*/
+  setSubdivisionSteps(steps) {
+    this.subdivisionSteps = steps.filter(s => s !== 0);
     if (this.isPlaying && this.audioContext) this._resetScheduler();
   }
 
@@ -198,12 +202,9 @@ class Metronome {
       default:          this._soundClick(ctx, time, isAccent);     break;
     }
 
-    // 裏拍（サブディビジョン）
-    if (this.subdivisionType !== 'none') {
-      const offset = this.subdivisionType === 'shuffle'
-        ? this._secondsPerBeat * (2 / 3)  // 三連符の3拍目
-        : this._secondsPerBeat * 0.5;     // 8分音符
-      const subTime = time + offset;
+    // 裏拍（12等分ステップ）
+    for (const step of this.subdivisionSteps) {
+      const subTime = time + this._secondsPerBeat * (step / 12);
       switch (this.soundType) {
         case 'woodblock': this._soundWoodblock(ctx, subTime, false, 0.45); break;
         case 'snare':     this._soundSnare(ctx, subTime, false, 0.45);     break;
