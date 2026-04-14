@@ -4,13 +4,16 @@
  * オフラインキャッシュは不要のため、ネットワーク優先で動作
  */
 
-const CACHE_NAME = 'acapella-v22';
+const CACHE_NAME = 'acapella-v29';
 const CACHE_URLS = [
   './index.html',
   './style.css',
-  './app.js',
-  './pitch-pipe.js',
-  './metronome.js',
+  './js/storage.js',
+  './js/library.js',
+  './js/settings.js',
+  './js/app.js',
+  './js/pitch-pipe.js',
+  './js/metronome.js',
   './manifest.json',
 ];
 

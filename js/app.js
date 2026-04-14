@@ -107,6 +107,14 @@ function initPitchPipe() {
     pitchPipe.stopAll();
     document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
   });
+
+  // 起動時にストレージの設定を適用
+  const stored = getSettings();
+  applyFreq(stored.baseFreq);
+  pitchPipe.setWaveType(stored.waveType);
+  document.querySelectorAll('#wave-type .segment-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.wave === stored.waveType);
+  });
 }
 
 // ─── メトロノーム UI ─────────────────────────
@@ -206,6 +214,13 @@ function initMetronome() {
   // 初期状態
   buildBeatDots(4);
   applyBPM(120);
+
+  // 起動時にストレージの設定を適用
+  const storedSound = getSettings().soundType;
+  metronome.setSoundType(storedSound);
+  document.querySelectorAll('#metro-sound-type .segment-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sound === storedSound);
+  });
 }
 
 // ─── リズムタブ ──────────────────────────────
@@ -350,6 +365,33 @@ function initRhythm() {
   buildClock();
 }
 
+// ─── 「今の状態を保存」ボタン ─────────────────
+function initSaveState() {
+  document.getElementById('save-state-btn').addEventListener('click', () => {
+    // 現在のピッチパイプのキー音を収集
+    const activeKeys = Array.from(document.querySelectorAll('.note-btn.active'))
+      .map(btn => btn.dataset.note);
+
+    // 現在のBPM・基準周波数を取得
+    const bpm     = metronome.bpm;
+    const baseFreq = pitchPipe.baseFreq;
+
+    // メトロノーム停止
+    if (metronome.isPlaying) {
+      metronome.stop();
+      document.getElementById('metro-toggle-label').textContent = 'スタート';
+      document.getElementById('metro-toggle').classList.remove('playing');
+    }
+
+    // ピッチパイプ全音停止
+    pitchPipe.stopAll();
+    document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
+
+    // ライブラリの編集画面を新規追加モードで開く（初期値をキャプチャした状態で）
+    openLibraryNewSong({ keys: activeKeys, bpm, baseFreq });
+  });
+}
+
 // ─── 全停止ボタン ────────────────────────────
 function initGlobalStop() {
   document.getElementById('global-stop').addEventListener('click', () => {
@@ -377,6 +419,42 @@ function registerSW() {
   }
 }
 
+// ─── ハンバーガーメニュー ─────────────────────
+function initHamburgerMenu() {
+  const btn     = document.getElementById('hamburger-btn');
+  const overlay = document.getElementById('menu-overlay');
+  const sheet   = document.getElementById('menu-sheet');
+
+  function openMenu() {
+    overlay.classList.add('open');
+    sheet.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+    overlay.setAttribute('aria-hidden', 'false');
+    sheet.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeMenu() {
+    overlay.classList.remove('open');
+    sheet.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+    overlay.setAttribute('aria-hidden', 'true');
+    sheet.setAttribute('aria-hidden', 'true');
+  }
+
+  btn.addEventListener('click', openMenu);
+  overlay.addEventListener('click', closeMenu);
+
+  // 各メニュー項目
+  document.getElementById('menu-library').addEventListener('click', () => {
+    closeMenu();
+    openLibrary();
+  });
+  document.getElementById('menu-settings').addEventListener('click', () => {
+    closeMenu();
+    openSettings();
+  });
+}
+
 // ─── 初期化 ──────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
@@ -384,5 +462,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initMetronome();
   initRhythm();
   initGlobalStop();
+  initSaveState();
+  initHamburgerMenu();
+  initLibrary();
+  initSettings();
   registerSW();
 });

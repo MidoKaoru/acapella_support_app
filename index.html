@@ -15,6 +15,13 @@
 
   <!-- ===== タブバー ===== -->
   <nav class="tab-bar" role="tablist">
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="メニューを開く" aria-haspopup="true" aria-expanded="false">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="6"  x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
     <button class="tab-btn active" data-tab="analysis" role="tab" aria-selected="true">
       <span class="tab-icon" aria-hidden="true">🎙</span>
       <span class="tab-label">解析・ログ</span>
@@ -212,13 +219,148 @@
         <span id="metro-toggle-label">スタート</span>
       </button>
     </div>
+    <button class="save-state-btn" id="save-state-btn" aria-label="今の状態を保存">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+      <span>保存</span>
+    </button>
     <button class="global-stop-btn" id="global-stop" aria-label="全停止">
       ■ 全停止
     </button>
   </div>
 
-  <script src="pitch-pipe.js"></script>
-  <script src="metronome.js"></script>
-  <script src="app.js"></script>
+  <!-- ===== ハンバーガーメニュー ===== -->
+  <div class="menu-overlay" id="menu-overlay" aria-hidden="true"></div>
+  <div class="menu-sheet" id="menu-sheet" aria-hidden="true" role="dialog" aria-label="メニュー">
+    <div class="menu-sheet-handle"></div>
+    <nav class="menu-list">
+      <button class="menu-item" id="menu-library">
+        <span class="menu-item-icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19V6a2 2 0 0 1 2-2h13"/>
+            <path d="M4 19a2 2 0 0 0 2 2h13V8H6a2 2 0 0 0-2 2v9z"/>
+          </svg>
+        </span>
+        <span class="menu-item-label">曲ライブラリ</span>
+      </button>
+      <button class="menu-item" id="menu-settings">
+        <span class="menu-item-icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </span>
+        <span class="menu-item-label">設定</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ===== 曲ライブラリ画面 ===== -->
+  <div class="sub-screen" id="screen-library" aria-hidden="true">
+    <header class="sub-screen-header">
+      <button class="back-btn" id="library-back-btn" aria-label="戻る">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <h1 class="sub-screen-title" id="library-title">曲ライブラリ</h1>
+      <button class="header-add-btn" id="library-add-btn" aria-label="追加">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+    </header>
+    <div id="library-content" class="sub-screen-content">
+      <!-- JS で動的に描画 -->
+    </div>
+  </div>
+
+  <!-- ===== 設定画面 ===== -->
+  <div class="sub-screen" id="screen-settings" aria-hidden="true">
+    <header class="sub-screen-header">
+      <button class="back-btn" id="settings-back-btn" aria-label="戻る">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <h1 class="sub-screen-title">設定</h1>
+    </header>
+    <div class="sub-screen-content">
+
+      <!-- ピッチパイプ -->
+      <div class="settings-section">
+        <p class="settings-section-label">ピッチパイプ</p>
+
+        <div class="card control-group">
+          <div class="freq-header">
+            <span class="control-label">基準周波数デフォルト（A4）</span>
+            <span class="freq-display" id="settings-freq-display">440.0 Hz</span>
+          </div>
+          <div class="freq-controls">
+            <button class="adj-btn" id="settings-freq-down-big" aria-label="−1Hz">−1</button>
+            <button class="adj-btn" id="settings-freq-down"     aria-label="−0.1Hz">−0.1</button>
+            <input type="range" id="settings-freq-slider" min="420" max="460" step="0.1" value="440"
+              class="freq-slider" aria-label="基準周波数スライダー">
+            <button class="adj-btn" id="settings-freq-up"     aria-label="+0.1Hz">+0.1</button>
+            <button class="adj-btn" id="settings-freq-up-big" aria-label="+1Hz">+1</button>
+          </div>
+        </div>
+
+        <div class="card control-group">
+          <span class="control-label">音色デフォルト</span>
+          <div class="segment-control" id="settings-wave-type" role="group" aria-label="音色デフォルト選択">
+            <button class="segment-btn active" data-wave="sine">サイン波</button>
+            <button class="segment-btn" data-wave="triangle">三角波</button>
+            <button class="segment-btn" data-wave="square">矩形波</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- メトロノーム -->
+      <div class="settings-section">
+        <p class="settings-section-label">メトロノーム</p>
+
+        <div class="card control-group">
+          <span class="control-label">クリック音デフォルト</span>
+          <div class="segment-control" id="settings-sound-type" role="group" aria-label="クリック音デフォルト選択">
+            <button class="segment-btn" data-sound="click">クリック</button>
+            <button class="segment-btn active" data-sound="woodblock">ウッドブロック</button>
+            <button class="segment-btn" data-sound="snare">スネア</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI・API -->
+      <div class="settings-section">
+        <p class="settings-section-label">AI・API（フェーズ2用）</p>
+
+        <div class="card settings-api-card">
+          <span class="control-label">Gemini APIキー</span>
+          <p class="settings-api-warning">⚠️ APIキーはこの端末にのみ保存されます。共有端末での使用はお控えください。</p>
+          <div class="settings-api-input-row">
+            <input type="password" id="settings-api-key" class="settings-api-input"
+              placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
+            <button class="settings-api-toggle" id="settings-api-toggle" aria-label="表示切替">表示</button>
+          </div>
+          <button class="settings-api-save-btn" id="settings-api-save">保存して接続確認</button>
+          <p class="settings-api-status" id="settings-api-status"></p>
+          <p class="settings-api-guide">APIキーの取得：<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/pitch-pipe.js"></script>
+  <script src="js/metronome.js"></script>
+  <script src="js/library.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
