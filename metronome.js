@@ -14,7 +14,7 @@ class Metronome {
     this.beatsPerMeasure = 4;
     this.currentBeat     = 0;
     this.nextBeatTime    = 0;
-    this.soundType       = 'click';
+    this.soundType       = 'woodblock';
     // 12等分の裏拍パターン。各要素は 0〜11 のステップ番号。
     // 0（12時）= 表拍で常にON（このリストには含まず別途鳴らす）。
     // 例: [6] = 8分裏、[3,6,9] = 16分、[8] = シャッフル
@@ -225,67 +225,100 @@ class Metronome {
   // ─── 音生成（全ノードを _scheduledNodes に登録） ─
 
   // beatLevel: 2=アクセント(1拍目) / 1=通常拍頭 / 0=裏拍
+  // 設計: 高域ノイズバースト(4kHz帯) + サイン波トーン の2層構造
+  // → ノイズが "カチッ" という硬い立ち上がりを作り、トーンが音程感を与える
   _soundClick(ctx, time, beatLevel) {
-    // [sub, beat, accent]
-    const freqs  = [ 700,  900, 1050];
-    const gains  = [ 0.6,  1.4,  2.0];
-    const decays = [0.03, 0.05, 0.06];
-
     const out = this._getOutput();
+
+    // [sub, beat, accent]
+    const oscFreqs  = [ 900, 1300, 1700]; // トーン音程（高いほど硬く聞こえる）
+    const oscGains  = [ 0.5,  1.0,  1.6];
+    const oscDecays = [0.025, 0.038, 0.05];
+    const nGains    = [ 0.5,  1.0,  1.6]; // 高域ノイズの強さ
+
+    // ── 高域ノイズバースト（硬い立ち上がり "カチッ"）
+    const nLen  = Math.floor(ctx.sampleRate * 0.007); // 7ms
+    const nBuf  = ctx.createBuffer(1, nLen, ctx.sampleRate);
+    const nData = nBuf.getChannelData(0);
+    for (let i = 0; i < nLen; i++) nData[i] = Math.random() * 2 - 1;
+
+    const nSrc = ctx.createBufferSource();
+    const nBp  = ctx.createBiquadFilter();
+    const nEnv = ctx.createGain();
+    nSrc.buffer          = nBuf;
+    nBp.type             = 'bandpass';
+    nBp.frequency.value  = 4500; // 4.5kHz: 声域(300Hz〜3kHz)の上を突く
+    nBp.Q.value          = 2.5;
+    nEnv.gain.setValueAtTime(nGains[beatLevel], time);
+    nEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.006);
+    nSrc.connect(nBp); nBp.connect(nEnv); nEnv.connect(out);
+    nSrc.start(time); nSrc.stop(time + 0.012);
+
+    // ── サイン波トーン（音程感・持続）
     const osc = ctx.createOscillator();
     const env = ctx.createGain();
+    osc.frequency.value = oscFreqs[beatLevel];
+    env.gain.setValueAtTime(oscGains[beatLevel], time);
+    env.gain.exponentialRampToValueAtTime(0.001, time + oscDecays[beatLevel]);
+    osc.connect(env); env.connect(out);
+    osc.start(time); osc.stop(time + oscDecays[beatLevel] + 0.01);
 
-    osc.frequency.value = freqs[beatLevel];
-    env.gain.setValueAtTime(gains[beatLevel], time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + decays[beatLevel]);
-
-    osc.connect(env);
-    env.connect(out);
-    osc.start(time);
-    osc.stop(time + decays[beatLevel] + 0.02);
-
-    this._scheduledNodes.push(osc);
-    osc.onended = () => {
-      const i = this._scheduledNodes.indexOf(osc);
-      if (i !== -1) this._scheduledNodes.splice(i, 1);
-    };
+    this._scheduledNodes.push(nSrc, osc);
+    [nSrc, osc].forEach(node => {
+      node.onended = () => {
+        const i = this._scheduledNodes.indexOf(node);
+        if (i !== -1) this._scheduledNodes.splice(i, 1);
+      };
+    });
   }
 
   // beatLevel: 2=アクセント(1拍目) / 1=通常拍頭 / 0=裏拍
+  // 設計: 2本のバンドパス共鳴器を並列で鳴らす
+  //   低域共鳴: 木の「コン」という胴体音
+  //   高域共鳴: 「カッ」という硬い打撃感。声域(3kHz以上)を突く
   _soundWoodblock(ctx, time, beatLevel) {
+    const out = this._getOutput();
+
     // [sub, beat, accent]
-    const freqs  = [ 540,  740,  920];
-    const gains  = [ 1.6,  3.2,  5.0];
-    const decays = [0.05, 0.06, 0.07];
+    const loFreqs  = [ 700, 1000, 1300]; // 低域共鳴周波数
+    const loGains  = [ 1.4,  2.8,  4.5];
+    const loDecays = [0.06, 0.08, 0.10];
+    const loQ      = 14; // Qが高いほど「木」らしいリング感
 
-    const out    = this._getOutput();
-    const bufLen = Math.floor(ctx.sampleRate * 0.08);
-    const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-    const data   = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const hiFreqs  = [2200, 3000, 3800]; // 高域打撃成分（声を突き抜ける帯域）
+    const hiGains  = [ 1.0,  2.0,  3.2];
+    const hiDecays = [0.012, 0.018, 0.024]; // 非常に短い → 硬い立ち上がり
+    const hiQ      = 6;
 
-    const src    = ctx.createBufferSource();
-    const filter = ctx.createBiquadFilter();
-    const env    = ctx.createGain();
+    const bufLen = Math.floor(ctx.sampleRate * 0.11);
 
-    src.buffer             = buf;
-    filter.type            = 'bandpass';
-    filter.frequency.value = freqs[beatLevel];
-    filter.Q.value         = 8;
-    env.gain.setValueAtTime(gains[beatLevel], time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + decays[beatLevel]);
+    [[loFreqs, loGains, loDecays, loQ], [hiFreqs, hiGains, hiDecays, hiQ]]
+      .forEach(([freqs, gains, decays, Q]) => {
+        const buf  = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
 
-    src.connect(filter);
-    filter.connect(env);
-    env.connect(out);
-    src.start(time);
-    src.stop(time + decays[beatLevel] + 0.02);
+        const src = ctx.createBufferSource();
+        const bp  = ctx.createBiquadFilter();
+        const env = ctx.createGain();
 
-    this._scheduledNodes.push(src);
-    src.onended = () => {
-      const i = this._scheduledNodes.indexOf(src);
-      if (i !== -1) this._scheduledNodes.splice(i, 1);
-    };
+        src.buffer         = buf;
+        bp.type            = 'bandpass';
+        bp.frequency.value = freqs[beatLevel];
+        bp.Q.value         = Q;
+        env.gain.setValueAtTime(gains[beatLevel], time);
+        env.gain.exponentialRampToValueAtTime(0.001, time + decays[beatLevel]);
+
+        src.connect(bp); bp.connect(env); env.connect(out);
+        src.start(time);
+        src.stop(time + decays[beatLevel] + 0.02);
+
+        this._scheduledNodes.push(src);
+        src.onended = () => {
+          const i = this._scheduledNodes.indexOf(src);
+          if (i !== -1) this._scheduledNodes.splice(i, 1);
+        };
+      });
   }
 
   // beatLevel: 2=アクセント(1拍目) / 1=通常拍頭 / 0=裏拍
