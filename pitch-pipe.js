@@ -123,8 +123,4 @@ class PitchPipe {
     });
   }
 
-  /** 指定音名が発音中かどうか */
-  isActive(noteName) {
-    return !!this.activeNodes[noteName];
-  }
 }
