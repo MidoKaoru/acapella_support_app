@@ -356,8 +356,8 @@ function initGlobalStop() {
     // メトロノーム停止
     if (metronome.isPlaying) {
       metronome.stop();
-      metroToggleLabel.textContent = 'スタート';
-      metroToggle.classList.remove('playing');
+      document.getElementById('metro-toggle-label').textContent = 'スタート';
+      document.getElementById('metro-toggle').classList.remove('playing');
     }
 
     // ピッチパイプ全音停止
