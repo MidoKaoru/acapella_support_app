@@ -220,7 +220,7 @@ function initRhythm() {
     straight8:       [6],
     sixteenth:       [3, 6, 9],
     shuffle:         [8],
-    halftimeShuffle: [2, 3, 5, 6, 8, 9, 11],
+    halftimeShuffle: [4, 6, 10],
   };
 
   // 現在のステップ状態（0は常にtrue）
