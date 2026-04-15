@@ -150,6 +150,7 @@ select {
   bottom: calc(var(--controller-height) + var(--safe-bottom));
   left: 0;
   right: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -160,6 +161,26 @@ select {
 
 .tab-panel.active {
   display: block;
+}
+
+@keyframes tabSlideInFromRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes tabSlideInFromLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+.tab-panel.slide-in-right {
+  display: block;
+  animation: tabSlideInFromRight 0.28s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.tab-panel.slide-in-left {
+  display: block;
+  animation: tabSlideInFromLeft 0.28s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
 .panel-content {

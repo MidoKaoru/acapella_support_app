@@ -38,23 +38,53 @@ const pitchPipe = new PitchPipe();
 const metronome = new Metronome();
 
 // ─── タブ管理 ────────────────────────────────
-function initTabs() {
+let _animatingPanel = null;
+
+function switchToTab(targetBtn, direction) {
   const tabBtns   = document.querySelectorAll('.tab-btn');
   const tabPanels = document.querySelectorAll('.tab-panel');
 
-  tabBtns.forEach(btn => {
+  if (targetBtn.classList.contains('active')) return;
+
+  // 進行中のアニメーションをキャンセル
+  if (_animatingPanel) {
+    _animatingPanel.classList.remove('slide-in-left', 'slide-in-right');
+    _animatingPanel = null;
+  }
+
+  // タブボタンの状態更新
+  tabBtns.forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-selected', 'false');
+  });
+  targetBtn.classList.add('active');
+  targetBtn.setAttribute('aria-selected', 'true');
+
+  // 現在のパネルを非表示
+  tabPanels.forEach(p => p.classList.remove('active'));
+
+  // 新しいパネルをスライドイン
+  const nextPanel = document.getElementById(`tab-${targetBtn.dataset.tab}`);
+  const animClass = direction === 'left' ? 'slide-in-left' : 'slide-in-right';
+  _animatingPanel = nextPanel;
+  nextPanel.classList.add(animClass);
+  nextPanel.addEventListener('animationend', () => {
+    nextPanel.classList.remove(animClass);
+    nextPanel.classList.add('active');
+    if (_animatingPanel === nextPanel) _animatingPanel = null;
+  }, { once: true });
+}
+
+function initTabs() {
+  const tabBtns = document.querySelectorAll('.tab-btn');
+
+  tabBtns.forEach((btn, idx) => {
     btn.addEventListener('click', () => {
-      const target = btn.dataset.tab;
-
-      tabBtns.forEach(b => {
-        b.classList.remove('active');
-        b.setAttribute('aria-selected', 'false');
-      });
-      tabPanels.forEach(p => p.classList.remove('active'));
-
-      btn.classList.add('active');
-      btn.setAttribute('aria-selected', 'true');
-      document.getElementById(`tab-${target}`).classList.add('active');
+      let currentIdx = 0;
+      tabBtns.forEach((b, i) => { if (b.classList.contains('active')) currentIdx = i; });
+      // 同じタブなら何もしない
+      if (idx === currentIdx) return;
+      switchToTab(btn, idx > currentIdx ? 'right' : 'left');
     });
   });
 }
@@ -504,7 +534,7 @@ function initSwipe() {
 
     const next = dx < 0 ? current + 1 : current - 1;
     if (next < 0 || next >= TABS.length) return;
-    tabBtns[next].click();
+    switchToTab(tabBtns[next], dx < 0 ? 'right' : 'left');
   }, { passive: true });
 }
 
