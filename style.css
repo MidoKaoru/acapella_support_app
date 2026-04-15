@@ -145,10 +145,11 @@ select {
 
 /* ===== タブコンテンツ ===== */
 .tab-content {
-  padding-top: calc(var(--tab-height) + var(--safe-top));
-  padding-bottom: calc(var(--controller-height) + var(--safe-bottom) + 8px);
-  height: 100vh;
-  height: 100dvh;
+  position: fixed;
+  top: calc(var(--tab-height) + var(--safe-top));
+  bottom: calc(var(--controller-height) + var(--safe-bottom));
+  left: 0;
+  right: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
