@@ -606,6 +606,7 @@ input.bpm-slider::-moz-range-track {
 .metro-toggle-btn {
   display: flex;
   align-items: center;
+  justify-content: center; /* 横方向も中央に寄せる */
   gap: 4px;
   border: none;
   background: var(--cta);
@@ -615,6 +616,7 @@ input.bpm-slider::-moz-range-track {
   font-size: 12px;
   font-weight: 700;
   height: 38px;
+  line-height: 0;          /* 行間の影響を排除してアイコン位置を安定させる */
   transition: background 0.15s;
   box-shadow: 0 2px 8px rgba(8, 19, 26, 0.28);
   letter-spacing: 0.2px;
@@ -622,10 +624,20 @@ input.bpm-slider::-moz-range-track {
   flex-shrink: 0;
 }
 
+
+/* アイコン（三角形）が入っているラベルの微調整 */
+#metro-toggle-label {
+  display: flex;
+  align-items: center;
+  padding-top: 1px;        /* 視覚的に「浮いて」見えるのを防ぐため、1pxだけ下げる */
+}
+
+
 .metro-toggle-btn.playing {
   background: var(--danger);
   box-shadow: 0 2px 8px rgba(178, 35, 35, 0.35);
 }
+
 
 .metro-btn-icon {
   flex-shrink: 0;
@@ -665,6 +677,7 @@ input.bpm-slider::-moz-range-track {
   letter-spacing: 1.5px;
   text-transform: uppercase;
 }
+
 
 .bpm-value {
   font-size: 28px;
