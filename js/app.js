@@ -226,16 +226,20 @@ function initMetronome() {
     metronome.playBeatSound(ctx);
   }
 
-  document.getElementById('tap-btn').addEventListener('click', (e) => {
+  const tapBtn = document.getElementById('tap-btn');
+
+  function handleTap(e) {
     playTapClick();
 
     // リップルエフェクト
-    const btn  = e.currentTarget;
-    const rect = btn.getBoundingClientRect();
+    const btn    = tapBtn;
+    const rect   = btn.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const ripple = document.createElement('span');
     ripple.className = 'tap-ripple';
-    ripple.style.left = (e.clientX - rect.left) + 'px';
-    ripple.style.top  = (e.clientY - rect.top)  + 'px';
+    ripple.style.left = (clientX - rect.left) + 'px';
+    ripple.style.top  = (clientY - rect.top)  + 'px';
     btn.appendChild(ripple);
     ripple.addEventListener('animationend', () => ripple.remove());
 
@@ -250,7 +254,15 @@ function initMetronome() {
     // 4回以上でBPM算出・反映
     const bpm = metronome.tapTempo();
     if (bpm !== null && tapCount >= 4) applyBPM(bpm);
-  });
+  }
+
+  tapBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // click の遅延発火を抑止
+    handleTap(e);
+  }, { passive: false });
+
+  // タッチ非対応環境（PC）用フォールバック
+  tapBtn.addEventListener('mousedown', handleTap);
 
   // スタート / ストップ
   metroToggle.addEventListener('click', () => {
