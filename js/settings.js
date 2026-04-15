@@ -200,4 +200,18 @@ function initSettings() {
 
   // APIキー 保存・接続確認
   document.getElementById('settings-api-save').addEventListener('click', _saveAndTestApiKey);
+
+  // 右スワイプでメイン画面へ戻る
+  const _screen = document.getElementById('screen-settings');
+  let _sx = 0, _sy = 0;
+  _screen.addEventListener('touchstart', e => {
+    if (e.target.closest('input[type="range"]')) return;
+    _sx = e.touches[0].clientX;
+    _sy = e.touches[0].clientY;
+  }, { passive: true });
+  _screen.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _sx;
+    const dy = e.changedTouches[0].clientY - _sy;
+    if (dx > 50 && Math.abs(dx) > Math.abs(dy)) closeSettings();
+  }, { passive: true });
 }

@@ -759,6 +759,22 @@ function initLibrary() {
     if (_view === 'songs')  _navigate('edit', { groupId: _currentGroupId, songId: null });
   });
 
+  // 右スワイプで戻る（グループ一覧・曲一覧のみ）
+  const _screen = document.getElementById('screen-library');
+  let _sx = 0, _sy = 0;
+  _screen.addEventListener('touchstart', e => {
+    if (e.target.closest('input[type="range"]')) return;
+    _sx = e.touches[0].clientX;
+    _sy = e.touches[0].clientY;
+  }, { passive: true });
+  _screen.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _sx;
+    const dy = e.changedTouches[0].clientY - _sy;
+    if (dx > 50 && Math.abs(dx) > Math.abs(dy) && (_view === 'groups' || _view === 'songs')) {
+      _goBack();
+    }
+  }, { passive: true });
+
   document.getElementById('library-close-btn').addEventListener('click', () => {
     // 詳細ビューなら、その曲のBPMをメトロノームに反映してから閉じる
     if (_view === 'detail' && _currentGroupId && _currentSongId) {
