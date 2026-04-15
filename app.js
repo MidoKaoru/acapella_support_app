@@ -9,6 +9,17 @@
 
 'use strict';
 
+// ─── ボタンアイコン SVG 文字列（library.js からも参照） ──
+/* eslint-disable */
+var BTN_PLAY  = '<svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><polygon points="2,1 11,6 2,11"/></svg>';
+var BTN_PAUSE = '<svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><rect x="2" y="1" width="3" height="10" rx="0.5"/><rect x="7" y="1" width="3" height="10" rx="0.5"/></svg>';
+var BTN_STOP  = '<svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><rect x="1.5" y="1.5" width="9" height="9" rx="1"/></svg>';
+// ピッチパイプアイコン（線画ギア、ボタン用）
+var BTN_ICON_PITCH = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><path d="M10.75,4.10 L10.90,1.56 L13.10,1.56 L13.25,4.10 L14.87,4.53 L16.27,2.41 L18.17,3.51 L17.03,5.78 L18.22,6.97 L20.50,5.83 L21.59,7.73 L19.47,9.13 L19.90,10.75 L22.44,10.90 L22.44,13.10 L19.90,13.25 L19.47,14.87 L21.59,16.27 L20.50,18.17 L18.22,17.03 L17.03,18.22 L18.17,20.50 L16.27,21.59 L14.87,19.47 L13.25,19.90 L13.10,22.44 L10.90,22.44 L10.75,19.90 L9.13,19.47 L7.73,21.59 L5.83,20.50 L6.97,18.22 L5.78,17.03 L3.51,18.17 L2.41,16.27 L4.53,14.87 L4.10,13.25 L1.56,13.10 L1.56,10.90 L4.10,10.75 L4.53,9.13 L2.41,7.73 L3.51,5.83 L5.78,6.97 L6.97,5.78 L5.83,3.51 L7.73,2.41 L9.13,4.53 Z"/><circle cx="12" cy="12" r="2" stroke-width="1.5"/></svg>';
+// メトロノームアイコン（ボタン用）
+var BTN_ICON_METRO = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><polygon points="6,22 18,22 14,3 10,3"/><line x1="12" y1="20" x2="16.5" y2="9"/><circle cx="16" cy="9.5" r="1.5" fill="currentColor" stroke="none"/></svg>';
+/* eslint-enable */
+
 // ─── 共有 AudioContext ────────────────────────
 let _audioContext = null;
 
@@ -117,6 +128,16 @@ function initPitchPipe() {
   });
 }
 
+// ─── BPM ⇔ スライダー値 変換（グローバル） ────────────────
+// スライダー内部値 = BPM（40〜240 線形）
+function sliderToBpm(v) {
+  return Math.max(40, Math.min(240, Math.round(Number(v))));
+}
+
+function bpmToSlider(bpm) {
+  return Math.max(40, Math.min(240, Math.round(Number(bpm))));
+}
+
 // ─── メトロノーム UI ─────────────────────────
 function initMetronome() {
   const bpmInput        = document.getElementById('bpm-input');
@@ -128,10 +149,10 @@ function initMetronome() {
 
   // BPM 表示を一括更新
   function applyBPM(value) {
-    const bpm = Math.max(20, Math.min(300, Math.round(Number(value))));
+    const bpm = Math.max(40, Math.min(240, Math.round(Number(value))));
     metronome.setBPM(bpm);
-    bpmInput.value    = bpm;
-    bpmSlider.value   = bpm;
+    bpmInput.value        = bpm;
+    bpmSlider.value       = bpmToSlider(bpm);
     bottomBpm.textContent = bpm;
   }
 
@@ -159,51 +180,8 @@ function initMetronome() {
   bpmInput.addEventListener('change', () => applyBPM(bpmInput.value));
   bpmInput.addEventListener('blur',   () => applyBPM(bpmInput.value));
 
-  // BPM スライダー（マウス・キーボード用）
-  bpmSlider.addEventListener('input', () => applyBPM(bpmSlider.value));
-
-  // BPM スライダー 精密操作（タッチ専用）
-  // 指がトラックから縦に離れるほど感度を下げる。最大200pxで0.1倍速。
-  (function() {
-    let _lastTouchX   = 0;
-    let _floatVal     = 0;    // 小数で蓄積して applyBPM で整数化
-    let _trackCenterY = 0;
-    let _touchActive  = false;
-
-    bpmSlider.addEventListener('touchstart', e => {
-      e.preventDefault();     // ブラウザデフォルトのスライダー動作を無効化
-      const touch = e.touches[0];
-      const rect  = bpmSlider.getBoundingClientRect();
-      _lastTouchX   = touch.clientX;
-      _floatVal     = parseInt(bpmSlider.value, 10);
-      _trackCenterY = rect.top + rect.height / 2;
-      _touchActive  = true;
-    }, { passive: false });
-
-    bpmSlider.addEventListener('touchmove', e => {
-      if (!_touchActive) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      const rect  = bpmSlider.getBoundingClientRect();
-
-      // 縦方向の離れ具合で感度を決定
-      const verticalOffset = Math.abs(touch.clientY - _trackCenterY);
-      const slowdownFactor = Math.max(0.1, 1 - verticalOffset / 200);
-
-      // 横移動量をスライダーの値域（280）に換算し、感度を乗算
-      const deltaX      = touch.clientX - _lastTouchX;
-      const sliderRange = parseInt(bpmSlider.max, 10) - parseInt(bpmSlider.min, 10); // 280
-      const deltaVal    = (deltaX / rect.width) * sliderRange * slowdownFactor;
-
-      _floatVal   += deltaVal;
-      _lastTouchX  = touch.clientX;
-
-      applyBPM(_floatVal);
-    }, { passive: false });
-
-    bpmSlider.addEventListener('touchend',   () => { _touchActive = false; });
-    bpmSlider.addEventListener('touchcancel', () => { _touchActive = false; });
-  })();
+  // BPM スライダー（非線形スケール）
+  bpmSlider.addEventListener('input', () => applyBPM(sliderToBpm(bpmSlider.value)));
 
   // ±ボタン
   document.getElementById('bpm-down-big').addEventListener('click', () => applyBPM(metronome.bpm - 10));
@@ -233,30 +211,65 @@ function initMetronome() {
   });
 
   // タップテンポ
-  document.getElementById('tap-btn').addEventListener('click', () => {
-    getAudioContext(); // iOS: 最初のタップで AudioContext を起動
+  let tapCount = 0;
+  let tapResetTimer = null;
+  const tapDotsEl   = document.getElementById('tap-dots');
+  const tapDotNodes = tapDotsEl ? tapDotsEl.querySelectorAll('.tap-progress-dot') : [];
+
+  function resetTapState() {
+    tapCount = 0;
+    tapDotNodes.forEach(d => d.classList.remove('active'));
+  }
+
+  function playTapClick() {
+    const ctx = getAudioContext();
+    metronome.playBeatSound(ctx);
+  }
+
+  document.getElementById('tap-btn').addEventListener('click', (e) => {
+    playTapClick();
+
+    // リップルエフェクト
+    const btn  = e.currentTarget;
+    const rect = btn.getBoundingClientRect();
+    const ripple = document.createElement('span');
+    ripple.className = 'tap-ripple';
+    ripple.style.left = (e.clientX - rect.left) + 'px';
+    ripple.style.top  = (e.clientY - rect.top)  + 'px';
+    btn.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
+
+    // ドット更新
+    tapCount = Math.min(tapCount + 1, 4);
+    tapDotNodes.forEach((d, i) => d.classList.toggle('active', i < tapCount));
+
+    // 2.5秒無操作でリセット
+    clearTimeout(tapResetTimer);
+    tapResetTimer = setTimeout(resetTapState, 2500);
+
+    // 4回以上でBPM算出・反映
     const bpm = metronome.tapTempo();
-    if (bpm !== null) applyBPM(bpm);
+    if (bpm !== null && tapCount >= 4) applyBPM(bpm);
   });
 
   // スタート / ストップ
   metroToggle.addEventListener('click', () => {
     if (metronome.isPlaying) {
       metronome.stop();
-      metroToggleLabel.textContent = 'スタート';
+      metroToggleLabel.innerHTML = BTN_PLAY;
       metroToggle.classList.remove('playing');
     } else {
       const ctx = getAudioContext();
       metronome.setAudioContext(ctx);
       metronome.start();
-      metroToggleLabel.textContent = 'ストップ';
+      metroToggleLabel.innerHTML = BTN_PAUSE;
       metroToggle.classList.add('playing');
     }
   });
 
   // 初期状態
   buildBeatDots(4);
-  applyBPM(120);
+  applyBPM(120);  // 120 は 40〜240 範囲内
 
   // 起動時にストレージの設定を適用
   const storedSound = getSettings().soundType;
@@ -422,7 +435,7 @@ function initSaveState() {
     // メトロノーム停止
     if (metronome.isPlaying) {
       metronome.stop();
-      document.getElementById('metro-toggle-label').textContent = 'スタート';
+      document.getElementById('metro-toggle-label').innerHTML = BTN_PLAY;
       document.getElementById('metro-toggle').classList.remove('playing');
     }
 
@@ -441,7 +454,7 @@ function initGlobalStop() {
     // メトロノーム停止
     if (metronome.isPlaying) {
       metronome.stop();
-      document.getElementById('metro-toggle-label').textContent = 'スタート';
+      document.getElementById('metro-toggle-label').innerHTML = BTN_PLAY;
       document.getElementById('metro-toggle').classList.remove('playing');
     }
 

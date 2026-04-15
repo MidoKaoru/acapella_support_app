@@ -267,10 +267,23 @@ input[type="range"] {
   outline: none;
 }
 
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 24px;
   height: 24px;
+  margin-top: -10px; /* トラック(4px)に対してサム(24px)を垂直センタリング: (4-24)/2 = -10 */
   background: var(--cta);
   border-radius: 50%;
   cursor: pointer;
@@ -279,6 +292,35 @@ input[type="range"]::-webkit-slider-thumb {
 
 .freq-slider {
   flex: 1;
+}
+
+/* BPM スライダー 3区間カラー（低速域・メイン域・高速域） */
+input.bpm-slider {
+  background: linear-gradient(to right,
+    rgba(8, 19, 26, 0.18) 0%,   rgba(8, 19, 26, 0.18) 10%,
+    var(--primary)        10%,  var(--primary)        90%,
+    rgba(8, 19, 26, 0.18) 90%,  rgba(8, 19, 26, 0.18) 100%
+  );
+}
+
+input.bpm-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right,
+    rgba(8, 19, 26, 0.18) 0%,   rgba(8, 19, 26, 0.18) 10%,
+    var(--primary)        10%,  var(--primary)        90%,
+    rgba(8, 19, 26, 0.18) 90%,  rgba(8, 19, 26, 0.18) 100%
+  );
+}
+
+input.bpm-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right,
+    rgba(8, 19, 26, 0.18) 0%,   rgba(8, 19, 26, 0.18) 10%,
+    var(--primary)        10%,  var(--primary)        90%,
+    rgba(8, 19, 26, 0.18) 90%,  rgba(8, 19, 26, 0.18) 100%
+  );
 }
 
 /* ===== 音名グリッド ===== */
@@ -340,7 +382,18 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 600;
   color: var(--danger);
   min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
   transition: background 0.1s, color 0.1s;
+}
+
+.stop-notes-btn svg {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .stop-notes-btn:active {
@@ -448,24 +501,92 @@ input[type="range"]::-webkit-slider-thumb {
   letter-spacing: 1px;
 }
 
-/* タップテンポ */
-.tap-btn {
+/* テンポカード（拍子 + BPM + スライダー統合） */
+.tempo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* タップテンポカード */
+.tap-card {
   width: 100%;
-  border: 1.5px solid var(--cta);
-  background: transparent;
-  color: var(--cta);
-  border-radius: 12px;
-  padding: 16px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 0.12s;
+  box-shadow: var(--shadow-card);
+}
+
+.tap-card:active {
+  background: rgba(8, 19, 26, 0.05);
+}
+
+.tap-label-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text);
+  pointer-events: none;
+}
+
+.tap-icon {
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.tap-label-text {
   font-size: 17px;
   font-weight: 600;
-  min-height: 60px;
-  transition: background 0.1s, color 0.1s;
+  color: var(--text);
   letter-spacing: 0.2px;
 }
 
-.tap-btn:active {
-  background: var(--cta);
-  color: white;
+.tap-dots-row {
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.tap-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.tap-progress-dot.active {
+  background: var(--primary);
+  transform: scale(1.2);
+}
+
+/* リップルエフェクト */
+.tap-ripple {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(8, 19, 26, 0.12);
+  transform: translate(-50%, -50%) scale(0);
+  animation: tap-ripple-anim 0.55s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes tap-ripple-anim {
+  to {
+    transform: translate(-50%, -50%) scale(22);
+    opacity: 0;
+  }
 }
 
 /* メトロノームグループ（BPM表示 + スタートボタン） */
@@ -586,9 +707,20 @@ input[type="range"]::-webkit-slider-thumb {
   height: 38px;
   flex-shrink: 0;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
   box-shadow: 0 2px 8px rgba(178, 35, 35, 0.35);
   transition: transform 0.08s;
   letter-spacing: 0.3px;
+}
+
+.global-stop-btn svg {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .global-stop-btn:active {
@@ -1260,6 +1392,10 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 18px;
   font-weight: 700;
   min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   transition: background 0.15s;
   box-shadow: 0 4px 14px rgba(8, 19, 26, 0.28);
 }
@@ -1309,6 +1445,10 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 16px;
   font-weight: 600;
   min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   transition: background 0.12s;
 }
 .action-btn-secondary:active { background: rgba(8, 19, 26, 0.06); }

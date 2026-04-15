@@ -27,7 +27,47 @@
       <span class="tab-label">解析・ログ</span>
     </button>
     <button class="tab-btn" data-tab="pitch" role="tab" aria-selected="false">
-      <span class="tab-icon" aria-hidden="true">🎵</span>
+      <span class="tab-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24">
+          <!--
+            ピッチパイプ（円盤型）
+            ・ギア外形：R_root=8, R_tip=10.5, 12歯（半歯角6°）
+            ・白抜き内円：r=5.5
+            ・12個の音穴（白）：r=6.7 に配置
+            ・中央ハブ（塗り）：r=1.5
+          -->
+          <path fill="currentColor" stroke="none" d="
+            M10.75,4.10 L10.90,1.56 L13.10,1.56 L13.25,4.10
+            L14.87,4.53 L16.27,2.41 L18.17,3.51 L17.03,5.78
+            L18.22,6.97 L20.50,5.83 L21.59,7.73 L19.47,9.13
+            L19.90,10.75 L22.44,10.90 L22.44,13.10 L19.90,13.25
+            L19.47,14.87 L21.59,16.27 L20.50,18.17 L18.22,17.03
+            L17.03,18.22 L18.17,20.50 L16.27,21.59 L14.87,19.47
+            L13.25,19.90 L13.10,22.44 L10.90,22.44 L10.75,19.90
+            L9.13,19.47 L7.73,21.59 L5.83,20.50 L6.97,18.22
+            L5.78,17.03 L3.51,18.17 L2.41,16.27 L4.53,14.87
+            L4.10,13.25 L1.56,13.10 L1.56,10.90 L4.10,10.75
+            L4.53,9.13 L2.41,7.73 L3.51,5.83 L5.78,6.97
+            L6.97,5.78 L5.83,3.51 L7.73,2.41 L9.13,4.53 Z"/>
+          <!-- 内側くり抜き -->
+          <circle cx="12" cy="12" r="5.5" fill="white"/>
+          <!-- 音穴12個（白抜き、r=6.7 に等間隔配置） -->
+          <circle cx="12.00" cy="5.30"  r="0.9" fill="white"/>
+          <circle cx="15.35" cy="6.20"  r="0.9" fill="white"/>
+          <circle cx="17.80" cy="8.65"  r="0.9" fill="white"/>
+          <circle cx="18.70" cy="12.00" r="0.9" fill="white"/>
+          <circle cx="17.80" cy="15.35" r="0.9" fill="white"/>
+          <circle cx="15.35" cy="17.80" r="0.9" fill="white"/>
+          <circle cx="12.00" cy="18.70" r="0.9" fill="white"/>
+          <circle cx="8.65"  cy="17.80" r="0.9" fill="white"/>
+          <circle cx="6.20"  cy="15.35" r="0.9" fill="white"/>
+          <circle cx="5.30"  cy="12.00" r="0.9" fill="white"/>
+          <circle cx="6.20"  cy="8.65"  r="0.9" fill="white"/>
+          <circle cx="8.65"  cy="6.20"  r="0.9" fill="white"/>
+          <!-- 中央ハブ -->
+          <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+        </svg>
+      </span>
       <span class="tab-label">ピッチパイプ</span>
     </button>
     <button class="tab-btn" data-tab="metronome" role="tab" aria-selected="false">
@@ -42,13 +82,13 @@
     </button>
     <button class="tab-btn" data-tab="rhythm" role="tab" aria-selected="false">
       <span class="tab-icon" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"/>
-          <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
-          <line x1="12" y1="3" x2="12" y2="6"/>
-          <line x1="12" y1="18" x2="12" y2="21"/>
-          <line x1="3" y1="12" x2="6" y2="12"/>
-          <line x1="18" y1="12" x2="21" y2="12"/>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <!-- スティック1：チップ（左上）→シャフト（右下） -->
+          <circle cx="5" cy="4" r="2" fill="currentColor" stroke="none"/>
+          <line x1="6.6" y1="5.7" x2="20" y2="21"/>
+          <!-- スティック2：チップ（右上）→シャフト（左下） -->
+          <circle cx="19" cy="4" r="2" fill="currentColor" stroke="none"/>
+          <line x1="17.4" y1="5.7" x2="4" y2="21"/>
         </svg>
       </span>
       <span class="tab-label">リズム</span>
@@ -74,16 +114,6 @@
     <section id="tab-pitch" class="tab-panel" role="tabpanel">
       <div class="panel-content">
 
-        <!-- 音色選択 -->
-        <div class="card control-group">
-          <span class="control-label">音色</span>
-          <div class="segment-control" id="wave-type" role="group" aria-label="音色選択">
-            <button class="segment-btn active" data-wave="sine">サイン波</button>
-            <button class="segment-btn" data-wave="triangle">三角波</button>
-            <button class="segment-btn" data-wave="square">矩形波</button>
-          </div>
-        </div>
-
         <!-- 基準周波数 -->
         <div class="card control-group">
           <div class="freq-header">
@@ -106,7 +136,10 @@
         </div>
 
         <!-- 全音停止 -->
-        <button class="stop-notes-btn" id="stop-notes-btn">全音停止</button>
+        <button class="stop-notes-btn" id="stop-notes-btn">
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><rect x="1.5" y="1.5" width="9" height="9" rx="1"/></svg>
+          <span style="visibility:hidden">全音停止</span>
+        </button>
       </div>
     </section>
 
@@ -121,49 +154,40 @@
           </div>
         </div>
 
-        <!-- クリック音選択 -->
-        <div class="card control-group">
-          <span class="control-label">クリック音</span>
-          <div class="segment-control" id="metro-sound-type" role="group" aria-label="クリック音選択">
-            <button class="segment-btn" data-sound="click">クリック</button>
-            <button class="segment-btn active" data-sound="woodblock">ウッドブロック</button>
-            <button class="segment-btn" data-sound="snare">スネア</button>
-          </div>
-        </div>
-
-        <!-- BPM コントロール -->
-        <div class="card bpm-control">
-          <button class="bpm-adj-btn" id="bpm-down-big" aria-label="BPM −10">−10</button>
-          <button class="bpm-adj-btn" id="bpm-down" aria-label="BPM −1">−1</button>
-          <div class="bpm-display-wrap">
-            <input type="number" id="bpm-input" class="bpm-input"
-              value="120" min="20" max="300" aria-label="BPM入力">
-            <span class="bpm-unit">BPM</span>
-          </div>
-          <button class="bpm-adj-btn" id="bpm-up" aria-label="BPM +1">+1</button>
-          <button class="bpm-adj-btn" id="bpm-up-big" aria-label="BPM +10">+10</button>
-        </div>
-
-        <!-- BPM スライダー -->
-        <div class="card">
-          <input type="range" id="bpm-slider" min="20" max="300" value="120"
-            class="bpm-slider" aria-label="BPMスライダー">
-        </div>
-
-        <!-- 拍子選択 -->
-        <div class="card control-group">
-          <span class="control-label">拍子</span>
+        <!-- テンポカード（拍子 + BPM + スライダー） -->
+        <div class="card tempo-card">
           <div class="segment-control" id="time-sig" role="group" aria-label="拍子選択">
             <button class="segment-btn active" data-sig="4/4">4/4</button>
             <button class="segment-btn" data-sig="3/4">3/4</button>
             <button class="segment-btn" data-sig="2/4">2/4</button>
             <button class="segment-btn" data-sig="6/8">6/8</button>
           </div>
+          <div class="bpm-control">
+            <button class="bpm-adj-btn" id="bpm-down-big" aria-label="BPM −10">−10</button>
+            <button class="bpm-adj-btn" id="bpm-down" aria-label="BPM −1">−1</button>
+            <div class="bpm-display-wrap">
+              <input type="number" id="bpm-input" class="bpm-input"
+                value="120" min="40" max="240" aria-label="BPM入力">
+              <span class="bpm-unit">BPM</span>
+            </div>
+            <button class="bpm-adj-btn" id="bpm-up" aria-label="BPM +1">+1</button>
+            <button class="bpm-adj-btn" id="bpm-up-big" aria-label="BPM +10">+10</button>
+          </div>
+          <input type="range" id="bpm-slider" min="40" max="240" step="1" value="120"
+            class="bpm-slider" aria-label="BPMスライダー">
         </div>
 
-        <!-- タップテンポ -->
-        <button class="tap-btn" id="tap-btn" aria-label="タップテンポ">
-          タップテンポ
+        <!-- タップテンポカード -->
+        <button class="card tap-card" id="tap-btn" aria-label="タップテンポ">
+          <div class="tap-label-area">
+            <span class="tap-label-text">ここを叩いてテンポ入力</span>
+          </div>
+          <div class="tap-dots-row" id="tap-dots" aria-hidden="true">
+            <span class="tap-progress-dot"></span>
+            <span class="tap-progress-dot"></span>
+            <span class="tap-progress-dot"></span>
+            <span class="tap-progress-dot"></span>
+          </div>
         </button>
       </div>
     </section>
@@ -217,7 +241,7 @@
           <line x1="12" y1="20" x2="16.5" y2="9"/>
           <circle cx="16" cy="9.5" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
-        <span id="metro-toggle-label">スタート</span>
+        <span id="metro-toggle-label"><svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><polygon points="2,1 11,6 2,11"/></svg></span>
       </button>
     </div>
 
@@ -233,7 +257,8 @@
         <span>保存</span>
       </button>
       <button class="global-stop-btn" id="global-stop" aria-label="全停止">
-        ■ 全停止
+        <svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><rect x="1.5" y="1.5" width="9" height="9" rx="1"/></svg>
+        <span style="visibility:hidden">全停止</span>
       </button>
     </div>
   </div>
@@ -250,7 +275,7 @@
             <path d="M4 19a2 2 0 0 0 2 2h13V8H6a2 2 0 0 0-2 2v9z"/>
           </svg>
         </span>
-        <span class="menu-item-label">曲ライブラリ</span>
+        <span class="menu-item-label">ライブラリ</span>
       </button>
       <button class="menu-item" id="menu-settings">
         <span class="menu-item-icon" aria-hidden="true">
@@ -272,7 +297,7 @@
           <polyline points="15 18 9 12 15 6"/>
         </svg>
       </button>
-      <h1 class="sub-screen-title" id="library-title">曲ライブラリ</h1>
+      <h1 class="sub-screen-title" id="library-title">ライブラリ</h1>
       <button class="header-add-btn" id="library-add-btn" aria-label="追加">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
           <line x1="12" y1="5" x2="12" y2="19"/>
@@ -323,8 +348,8 @@
         </div>
 
         <div class="card control-group">
-          <span class="control-label">音色デフォルト</span>
-          <div class="segment-control" id="settings-wave-type" role="group" aria-label="音色デフォルト選択">
+          <span class="control-label">音色</span>
+          <div class="segment-control" id="settings-wave-type" role="group" aria-label="音色選択">
             <button class="segment-btn active" data-wave="sine">サイン波</button>
             <button class="segment-btn" data-wave="triangle">三角波</button>
             <button class="segment-btn" data-wave="square">矩形波</button>
@@ -337,8 +362,8 @@
         <p class="settings-section-label">メトロノーム</p>
 
         <div class="card control-group">
-          <span class="control-label">クリック音デフォルト</span>
-          <div class="segment-control" id="settings-sound-type" role="group" aria-label="クリック音デフォルト選択">
+          <span class="control-label">クリック音</span>
+          <div class="segment-control" id="settings-sound-type" role="group" aria-label="クリック音選択">
             <button class="segment-btn" data-sound="click">クリック</button>
             <button class="segment-btn active" data-sound="woodblock">ウッドブロック</button>
             <button class="segment-btn" data-sound="snare">スネア</button>
