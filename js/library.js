@@ -18,6 +18,7 @@ let _isMetroPlaying  = false;   // メトロノーム再生中
 let _pendingSnapshot = null;    // 「今の状態を保存」からの初期値
 let _groupSort       = 'manual'; // グループ一覧の並び順
 let _songSort        = 'manual'; // 曲一覧の並び順
+let _tempBpm         = null;    // 曲詳細画面の一時BPM（保存しない）
 
 // ─── 公開 API ────────────────────────────────
 
@@ -362,6 +363,9 @@ function _renderDetail(content, groupId, songId) {
   const song  = group?.songs.find(s => s.id === songId);
   if (!song) { _navigate('songs', { groupId }); return; }
 
+  // 一時BPMを元の値で初期化
+  _tempBpm = song.bpm;
+
   const keysHtml = song.keys.length
     ? song.keys.map(k => `<span class="detail-key-chip">${_esc(k)}</span>`).join('')
     : '<span class="detail-key-none">キー未設定</span>';
@@ -370,11 +374,18 @@ function _renderDetail(content, groupId, songId) {
     <div class="library-detail-view">
       <div class="card detail-card">
         <div class="detail-keys-row">${keysHtml}</div>
+        <div class="detail-bpm-section">
+          <span class="detail-info-label">BPM</span>
+          <div class="detail-bpm-ctrl">
+            <button class="bpm-adj-btn" id="detail-bpm-down10" aria-label="BPM −10">−10</button>
+            <button class="bpm-adj-btn" id="detail-bpm-down1"  aria-label="BPM −1">−1</button>
+            <span class="detail-info-value" id="detail-bpm-value">${song.bpm}</span>
+            <button class="bpm-adj-btn" id="detail-bpm-up1"   aria-label="BPM +1">+1</button>
+            <button class="bpm-adj-btn" id="detail-bpm-up10"  aria-label="BPM +10">+10</button>
+            <button class="detail-bpm-reset" id="detail-bpm-reset" aria-label="元のBPMに戻す">↺</button>
+          </div>
+        </div>
         <div class="detail-info-row">
-          <span class="detail-info-item">
-            <span class="detail-info-label">BPM</span>
-            <span class="detail-info-value">${song.bpm}</span>
-          </span>
           <span class="detail-info-item">
             <span class="detail-info-label">基準周波数</span>
             <span class="detail-info-value">${parseFloat(song.baseFreq).toFixed(1)} Hz</span>
@@ -389,6 +400,24 @@ function _renderDetail(content, groupId, songId) {
       <button class="action-btn-secondary" id="detail-edit-btn">編集</button>
     </div>`;
 
+  // 一時BPM変更
+  function _applyDetailBpm(bpm) {
+    _tempBpm = Math.max(40, Math.min(240, Math.round(bpm)));
+    document.getElementById('detail-bpm-value').textContent = _tempBpm;
+    if (_isMetroPlaying) {
+      metronome.setBPM(_tempBpm);
+      document.getElementById('bpm-input').value        = String(_tempBpm);
+      document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(_tempBpm));
+      document.getElementById('bottom-bpm').textContent = String(_tempBpm);
+    }
+  }
+
+  document.getElementById('detail-bpm-down10').addEventListener('click', () => _applyDetailBpm(_tempBpm - 10));
+  document.getElementById('detail-bpm-down1') .addEventListener('click', () => _applyDetailBpm(_tempBpm - 1));
+  document.getElementById('detail-bpm-up1')   .addEventListener('click', () => _applyDetailBpm(_tempBpm + 1));
+  document.getElementById('detail-bpm-up10')  .addEventListener('click', () => _applyDetailBpm(_tempBpm + 10));
+  document.getElementById('detail-bpm-reset') .addEventListener('click', () => _applyDetailBpm(song.bpm));
+
   document.getElementById('detail-pitch-btn').addEventListener('click', () => {
     if (_isPitchPlaying) {
       _stopPitch();
@@ -401,7 +430,7 @@ function _renderDetail(content, groupId, songId) {
     if (_isMetroPlaying) {
       _stopMetro();
     } else {
-      _playMetro(song);
+      _playMetro(song, _tempBpm);
     }
   });
 
@@ -433,15 +462,16 @@ function _stopPitch() {
 
 // ─── メトロノーム再生・停止 ──────────────────────
 
-function _playMetro(song) {
+function _playMetro(song, bpm) {
+  const actualBpm = bpm ?? song.bpm;
   const ctx = getAudioContext();
   if (metronome.isPlaying) metronome.stop();
   metronome.setAudioContext(ctx);
-  metronome.setBPM(song.bpm);
+  metronome.setBPM(actualBpm);
   metronome.setSubdivisionSteps([]); // 裏拍をリセットして表拍のみ鳴らす
-  const bpmVal = String(song.bpm);
+  const bpmVal = String(actualBpm);
   document.getElementById('bpm-input').value        = bpmVal;
-  document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(song.bpm));
+  document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(actualBpm));
   document.getElementById('bottom-bpm').textContent = bpmVal;
   metronome.start();
   document.getElementById('metro-toggle-label').innerHTML = BTN_PAUSE;
@@ -776,19 +806,21 @@ function initLibrary() {
   }, { passive: true });
 
   document.getElementById('library-close-btn').addEventListener('click', () => {
-    // 詳細ビューなら、その曲のBPMをメトロノームに反映してから閉じる
+    // 詳細ビューなら、一時BPM（変更済みの場合はそれ）をメインに反映してから閉じる
     if (_view === 'detail' && _currentGroupId && _currentSongId) {
-      const group = getSongs().groups.find(g => g.id === _currentGroupId);
-      const song  = group?.songs.find(s => s.id === _currentSongId);
-      if (song && song.bpm) {
-        const bpmVal = String(song.bpm);
+      const bpm = _tempBpm ?? (() => {
+        const group = getSongs().groups.find(g => g.id === _currentGroupId);
+        return group?.songs.find(s => s.id === _currentSongId)?.bpm;
+      })();
+      if (bpm) {
+        const bpmVal = String(bpm);
         const bpmInput  = document.getElementById('bpm-input');
         const bpmSlider = document.getElementById('bpm-slider');
         const bottomBpm = document.getElementById('bottom-bpm');
         if (bpmInput)  bpmInput.value  = bpmVal;
-        if (bpmSlider) bpmSlider.value = bpmVal;
+        if (bpmSlider) bpmSlider.value = Math.round(bpmToSlider(bpm));
         if (bottomBpm) bottomBpm.textContent = bpmVal;
-        metronome.setBPM(song.bpm);
+        metronome.setBPM(bpm);
       }
     }
     closeLibrary();

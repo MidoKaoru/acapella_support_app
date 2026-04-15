@@ -1413,6 +1413,48 @@ input.bpm-slider::-moz-range-track {
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+.detail-bpm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-bpm-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-bpm-ctrl .detail-info-value {
+  min-width: 52px;
+  text-align: center;
+}
+
+.detail-bpm-ctrl .bpm-adj-btn {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 12px;
+}
+
+.detail-bpm-reset {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 18px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+.detail-bpm-reset:active {
+  background: rgba(8, 19, 26, 0.08);
+}
+
 .detail-notes {
   font-size: 14px;
   color: var(--text-secondary);
