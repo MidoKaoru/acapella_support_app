@@ -221,21 +221,21 @@
       </button>
     </div>
 
-    <!-- 中央：保存（画面中央に固定） -->
-    <button class="save-state-btn" id="save-state-btn" aria-label="今の状態を保存">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-        <polyline points="17 21 17 13 7 13 7 21"/>
-        <polyline points="7 3 7 8 15 8"/>
-      </svg>
-      <span>保存</span>
-    </button>
-
-    <!-- 右：全停止（画面右端に固定） -->
-    <button class="global-stop-btn" id="global-stop" aria-label="全停止">
-      ■ 全停止
-    </button>
+    <!-- 右：保存＋全停止 -->
+    <div class="controller-right">
+      <button class="save-state-btn" id="save-state-btn" aria-label="今の状態を保存">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        <span>保存</span>
+      </button>
+      <button class="global-stop-btn" id="global-stop" aria-label="全停止">
+        ■ 全停止
+      </button>
+    </div>
   </div>
 
   <!-- ===== ハンバーガーメニュー ===== -->
