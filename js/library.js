@@ -65,8 +65,6 @@ function _navigate(view, options) {
   if (options.songId   !== undefined) _currentSongId  = options.songId;
   if (options.snapshot !== undefined) _pendingSnapshot = options.snapshot;
   _render();
-  // edit ビューに渡した後はクリア
-  if (view !== 'edit') _pendingSnapshot = null;
 }
 
 function _goBack() {
