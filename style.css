@@ -444,6 +444,15 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   align-items: center;
   gap: 8px;
+  justify-self: start;
+}
+
+.common-controller .save-state-btn {
+  justify-self: center;
+}
+
+.common-controller .global-stop-btn {
+  justify-self: end;
 }
 
 /* スタート / ストップ（共通コントローラー内） */
@@ -488,12 +497,12 @@ input[type="range"]::-webkit-slider-thumb {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   padding-left: 12px;
   padding-right: 12px;
-  gap: 8px;
+
 }
 
 .bpm-info {
@@ -517,6 +526,7 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--text);
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
+  min-width: 3ch;  /* 3桁分の幅を常に確保してレイアウトが動かないようにする */
 }
 
 .save-state-btn {
