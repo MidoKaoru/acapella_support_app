@@ -114,6 +114,19 @@ class Metronome {
     return Math.max(20, Math.min(300, Math.round(60000 / avg)));
   }
 
+  /** 通常拍頭（beatLevel=1）の音を即時再生。タップ入力のフィードバック用 */
+  playBeatSound(ctx) {
+    if (this.audioContext !== ctx) {
+      this.audioContext = ctx;
+      this._compressor  = null;
+    }
+    const now = ctx.currentTime;
+    switch (this.soundType) {
+      case 'woodblock': this._soundWoodblock(ctx, now, 1); break;
+      default:          this._soundClick(ctx, now, 1);     break;
+    }
+  }
+
   // ─── スケジューラーリセット ──────────────────────
 
   /**

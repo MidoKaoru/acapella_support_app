@@ -105,7 +105,7 @@ function _updateHeader() {
   const song    = group?.songs.find(s => s.id === _currentSongId);
 
   const titles = {
-    groups:       '曲ライブラリ',
+    groups:       'ライブラリ',
     'group-edit': _currentGroupId ? 'グループを編集' : 'グループを追加',
     songs:        group?.name ?? '曲一覧',
     detail:       song?.title ?? '曲詳細',
@@ -383,8 +383,8 @@ function _renderDetail(content, groupId, songId) {
         ${song.notes ? `<p class="detail-notes">${_esc(song.notes)}</p>` : ''}
       </div>
       <div class="detail-play-row">
-        <button class="detail-play-btn" id="detail-pitch-btn">▶ ピッチパイプ</button>
-        <button class="detail-play-btn" id="detail-metro-btn">▶ メトロノーム</button>
+        <button class="detail-play-btn" id="detail-pitch-btn">${BTN_ICON_PITCH}${BTN_PLAY}</button>
+        <button class="detail-play-btn" id="detail-metro-btn">${BTN_ICON_METRO}${BTN_PLAY}</button>
       </div>
       <button class="action-btn-secondary" id="detail-edit-btn">編集</button>
     </div>`;
@@ -419,7 +419,7 @@ function _playPitch(song) {
   song.keys.forEach(k => pitchPipe.toggle(k));
   _isPitchPlaying = true;
   const btn = document.getElementById('detail-pitch-btn');
-  if (btn) { btn.textContent = '■ ピッチ停止'; btn.classList.add('playing'); }
+  if (btn) { btn.innerHTML = BTN_ICON_PITCH + BTN_STOP; btn.classList.add('playing'); }
 }
 
 function _stopPitch() {
@@ -428,7 +428,7 @@ function _stopPitch() {
   document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
   _isPitchPlaying = false;
   const btn = document.getElementById('detail-pitch-btn');
-  if (btn) { btn.textContent = '▶ ピッチパイプ'; btn.classList.remove('playing'); }
+  if (btn) { btn.innerHTML = BTN_ICON_PITCH + BTN_PLAY; btn.classList.remove('playing'); }
 }
 
 // ─── メトロノーム再生・停止 ──────────────────────
@@ -438,28 +438,29 @@ function _playMetro(song) {
   if (metronome.isPlaying) metronome.stop();
   metronome.setAudioContext(ctx);
   metronome.setBPM(song.bpm);
+  metronome.setSubdivisionSteps([]); // 裏拍をリセットして表拍のみ鳴らす
   const bpmVal = String(song.bpm);
   document.getElementById('bpm-input').value        = bpmVal;
-  document.getElementById('bpm-slider').value       = bpmVal;
+  document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(song.bpm));
   document.getElementById('bottom-bpm').textContent = bpmVal;
   metronome.start();
-  document.getElementById('metro-toggle-label').textContent = 'ストップ';
+  document.getElementById('metro-toggle-label').innerHTML = BTN_PAUSE;
   document.getElementById('metro-toggle').classList.add('playing');
   _isMetroPlaying = true;
   const btn = document.getElementById('detail-metro-btn');
-  if (btn) { btn.textContent = '■ メトロ停止'; btn.classList.add('playing'); }
+  if (btn) { btn.innerHTML = BTN_ICON_METRO + BTN_STOP; btn.classList.add('playing'); }
 }
 
 function _stopMetro() {
   if (!_isMetroPlaying) return;
   if (metronome.isPlaying) {
     metronome.stop();
-    document.getElementById('metro-toggle-label').textContent = 'スタート';
+    document.getElementById('metro-toggle-label').innerHTML = BTN_PLAY;
     document.getElementById('metro-toggle').classList.remove('playing');
   }
   _isMetroPlaying = false;
   const btn = document.getElementById('detail-metro-btn');
-  if (btn) { btn.textContent = '▶ メトロノーム'; btn.classList.remove('playing'); }
+  if (btn) { btn.innerHTML = BTN_ICON_METRO + BTN_PLAY; btn.classList.remove('playing'); }
 }
 
 // ─── 全停止（ナビゲーション時に呼ぶ） ────────────
@@ -469,7 +470,7 @@ function _stopPlayback() {
   _stopMetro();
   // 編集画面の試奏ボタンもリセット
   const tryBtn = document.getElementById('edit-tryplay-btn');
-  if (tryBtn) tryBtn.textContent = '▶ 試奏';
+  if (tryBtn) tryBtn.innerHTML = BTN_PLAY + ' 試奏';
 }
 
 // ─── 曲編集ビュー ────────────────────────────
@@ -533,7 +534,7 @@ function _renderEdit(content, groupId, songId, snapshot) {
         </div>
       </div>
 
-      <button class="action-btn-secondary" id="edit-tryplay-btn">▶ 試奏</button>
+      <button class="action-btn-secondary" id="edit-tryplay-btn">${BTN_PLAY} 試奏</button>
 
       <div class="card control-group">
         <span class="control-label">メモ</span>
@@ -600,7 +601,7 @@ function _bindEditEvents(groupId, songId) {
     if (_isPitchPlaying || _isMetroPlaying) {
       _stopPitch();
       _stopMetro();
-      btn.textContent = '▶ 試奏';
+      btn.innerHTML = BTN_PLAY + ' 試奏';
     } else {
       const ctx = getAudioContext();
 
@@ -615,16 +616,17 @@ function _bindEditEvents(groupId, songId) {
       if (metronome.isPlaying) metronome.stop();
       metronome.setAudioContext(ctx);
       metronome.setBPM(_editDraft.bpm);
+      metronome.setSubdivisionSteps([]); // 裏拍をリセットして表拍のみ鳴らす
       const bpmVal = String(_editDraft.bpm);
       document.getElementById('bpm-input').value        = bpmVal;
-      document.getElementById('bpm-slider').value       = bpmVal;
+      document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(_editDraft.bpm));
       document.getElementById('bottom-bpm').textContent = bpmVal;
       metronome.start();
-      document.getElementById('metro-toggle-label').textContent = 'ストップ';
+      document.getElementById('metro-toggle-label').innerHTML = BTN_PAUSE;
       document.getElementById('metro-toggle').classList.add('playing');
       _isMetroPlaying = true;
 
-      btn.textContent = '■ 停止';
+      btn.innerHTML = BTN_STOP + ' 停止';
     }
   });
 
@@ -755,5 +757,24 @@ function initLibrary() {
   document.getElementById('library-add-btn').addEventListener('click', () => {
     if (_view === 'groups') _navigate('group-edit', { groupId: null });
     if (_view === 'songs')  _navigate('edit', { groupId: _currentGroupId, songId: null });
+  });
+
+  document.getElementById('library-close-btn').addEventListener('click', () => {
+    // 詳細ビューなら、その曲のBPMをメトロノームに反映してから閉じる
+    if (_view === 'detail' && _currentGroupId && _currentSongId) {
+      const group = getSongs().groups.find(g => g.id === _currentGroupId);
+      const song  = group?.songs.find(s => s.id === _currentSongId);
+      if (song && song.bpm) {
+        const bpmVal = String(song.bpm);
+        const bpmInput  = document.getElementById('bpm-input');
+        const bpmSlider = document.getElementById('bpm-slider');
+        const bottomBpm = document.getElementById('bottom-bpm');
+        if (bpmInput)  bpmInput.value  = bpmVal;
+        if (bpmSlider) bpmSlider.value = bpmVal;
+        if (bottomBpm) bottomBpm.textContent = bpmVal;
+        metronome.setBPM(song.bpm);
+      }
+    }
+    closeLibrary();
   });
 }
