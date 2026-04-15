@@ -19,6 +19,8 @@ let _pendingSnapshot = null;    // 「今の状態を保存」からの初期値
 let _groupSort       = 'manual'; // グループ一覧の並び順
 let _songSort        = 'manual'; // 曲一覧の並び順
 let _tempBpm         = null;    // 曲詳細画面の一時BPM（保存しない）
+let _isGroupSortEditing = false; // グループ並び替え編集モード
+let _isSongSortEditing  = false; // 曲並び替え編集モード
 
 // ─── 公開 API ────────────────────────────────
 
@@ -65,6 +67,8 @@ function _navigate(view, options) {
   if (options.groupId  !== undefined) _currentGroupId = options.groupId;
   if (options.songId   !== undefined) _currentSongId  = options.songId;
   if (options.snapshot !== undefined) _pendingSnapshot = options.snapshot;
+  _isGroupSortEditing = false;
+  _isSongSortEditing  = false;
   _render();
 }
 
@@ -85,11 +89,12 @@ function _goBack() {
 
 // ─── 描画ディスパッチャ ──────────────────────
 
-function _render() {
+function _render(resetScroll = true) {
   _updateHeader();
   const content = document.getElementById('library-content');
-  // スクロール位置をリセット
-  document.getElementById('screen-library').scrollTop = 0;
+  if (resetScroll) {
+    document.getElementById('screen-library').scrollTop = 0;
+  }
 
   switch (_view) {
     case 'groups':     _renderGroups(content);                                                    break;
@@ -133,7 +138,7 @@ function _sortItems(items, sortKey, nameField) {
   });
 }
 
-function _sortSelectHtml(id, currentVal) {
+function _sortSelectHtml(id, currentVal, isEditing) {
   const opts = [
     ['manual',    '手動'],
     ['date-asc',  '登録日時 古い順'],
@@ -141,11 +146,19 @@ function _sortSelectHtml(id, currentVal) {
     ['name-asc',  'あいうえお順 A→Z'],
     ['name-desc', 'あいうえお順 Z→A'],
   ];
+  const pencilBtn = currentVal === 'manual'
+    ? `<button class="sort-edit-btn${isEditing ? ' active' : ''}" id="${id}-edit-btn" aria-label="並び替え編集">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+        </svg>
+      </button>`
+    : '';
   return `<div class="sort-row">
     <label class="sort-label" for="${id}">並び順</label>
     <select class="sort-select" id="${id}">
       ${opts.map(([v, l]) => `<option value="${v}"${currentVal === v ? ' selected' : ''}>${l}</option>`).join('')}
     </select>
+    ${pencilBtn}
   </div>`;
 }
 
@@ -157,7 +170,7 @@ function _renderGroups(content) {
   let html = '<div class="library-groups-view">';
 
   if (data.groups.length >= 2) {
-    html += _sortSelectHtml('group-sort-select', _groupSort);
+    html += _sortSelectHtml('group-sort-select', _groupSort, _isGroupSortEditing);
   }
 
   if (data.groups.length === 0) {
@@ -168,7 +181,7 @@ function _renderGroups(content) {
   } else {
     html += '<div class="library-list">';
     sorted.forEach((g, idx) => {
-      const showMove = _groupSort === 'manual' && sorted.length >= 2;
+      const showMove = _groupSort === 'manual' && sorted.length >= 2 && _isGroupSortEditing;
       const moveBtns = showMove ? `
         <div class="library-card-sort-col">
           <button class="library-card-sort-btn" data-action="move-group-up"
@@ -218,7 +231,12 @@ function _renderGroups(content) {
 
   content.querySelector('#group-sort-select')?.addEventListener('change', e => {
     _groupSort = e.target.value;
-    _render();
+    if (_groupSort !== 'manual') _isGroupSortEditing = false;
+    _render(false);
+  });
+  content.querySelector('#group-sort-select-edit-btn')?.addEventListener('click', () => {
+    _isGroupSortEditing = !_isGroupSortEditing;
+    _render(false);
   });
   content.querySelectorAll('[data-action="open-songs"]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -305,7 +323,7 @@ function _renderSongs(content, groupId) {
   let html = '<div class="library-songs-view">';
 
   if (group.songs.length >= 2) {
-    html += _sortSelectHtml('song-sort-select', _songSort);
+    html += _sortSelectHtml('song-sort-select', _songSort, _isSongSortEditing);
   }
 
   if (group.songs.length === 0) {
@@ -318,7 +336,7 @@ function _renderSongs(content, groupId) {
     sorted.forEach((s, idx) => {
       const keysStr  = s.keys.length ? s.keys.join(' / ') : 'キーなし';
       const meta     = `${keysStr}　${s.bpm} BPM　${parseFloat(s.baseFreq).toFixed(1)} Hz`;
-      const showMove = _songSort === 'manual' && sorted.length >= 2;
+      const showMove = _songSort === 'manual' && sorted.length >= 2 && _isSongSortEditing;
       const moveBtns = showMove ? `
         <div class="library-card-sort-col">
           <button class="library-card-sort-btn" data-action="move-song-up"
@@ -342,7 +360,12 @@ function _renderSongs(content, groupId) {
 
   content.querySelector('#song-sort-select')?.addEventListener('change', e => {
     _songSort = e.target.value;
-    _render();
+    if (_songSort !== 'manual') _isSongSortEditing = false;
+    _render(false);
+  });
+  content.querySelector('#song-sort-select-edit-btn')?.addEventListener('click', () => {
+    _isSongSortEditing = !_isSongSortEditing;
+    _render(false);
   });
   content.querySelectorAll('[data-action="open-detail"]').forEach(btn => {
     btn.addEventListener('click', () =>
@@ -752,7 +775,7 @@ function _moveGroup(id, dir) {
   if (to < 0 || to >= d.groups.length) return;
   [d.groups[idx], d.groups[to]] = [d.groups[to], d.groups[idx]];
   saveSongs(d);
-  _render();
+  _render(false);
 }
 
 function _moveSong(groupId, songId, dir) {
@@ -764,7 +787,7 @@ function _moveSong(groupId, songId, dir) {
   if (to < 0 || to >= group.songs.length) return;
   [group.songs[idx], group.songs[to]] = [group.songs[to], group.songs[idx]];
   saveSongs(d);
-  _render();
+  _render(false);
 }
 
 // ─── ユーティリティ ──────────────────────────

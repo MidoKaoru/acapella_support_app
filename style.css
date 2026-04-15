@@ -882,7 +882,6 @@ input.bpm-slider::-moz-range-track {
   transform: translateX(100%);
   transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .sub-screen.open {
@@ -1307,6 +1306,31 @@ input.bpm-slider::-moz-range-track {
 
 .sort-select:focus {
   border-color: var(--focus);
+}
+
+.sort-edit-btn {
+  flex-shrink: 0;
+  margin-left: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.sort-edit-btn:active {
+  background: rgba(8, 19, 26, 0.08);
+}
+
+.sort-edit-btn.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
 }
 
 /* 手動並び替えボタン */
