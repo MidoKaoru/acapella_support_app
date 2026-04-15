@@ -476,6 +476,38 @@ function initGlobalStop() {
   });
 }
 
+// ─── タブ スワイプ操作 ───────────────────────
+function initSwipe() {
+  const TABS   = ['analysis', 'pitch', 'metronome', 'rhythm'];
+  const content = document.querySelector('.tab-content');
+  let startX = 0, startY = 0, tracking = false;
+
+  content.addEventListener('touchstart', (e) => {
+    // range スライダー上はスワイプ無視（スライダー操作と競合するため）
+    if (e.target.closest('input[type="range"]')) return;
+    startX   = e.touches[0].clientX;
+    startY   = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  content.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    // 水平移動が 50px 未満、または縦移動の方が大きい場合はスクロールとみなす
+    if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy)) return;
+
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    let current = 0;
+    tabBtns.forEach((btn, i) => { if (btn.classList.contains('active')) current = i; });
+
+    const next = dx < 0 ? current + 1 : current - 1;
+    if (next < 0 || next >= TABS.length) return;
+    tabBtns[next].click();
+  }, { passive: true });
+}
+
 // ─── Service Worker 登録（PWA） ──────────────
 function registerSW() {
   if ('serviceWorker' in navigator) {
@@ -526,6 +558,7 @@ function initHamburgerMenu() {
 // ─── 初期化 ──────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
+  initSwipe();
   initPitchPipe();
   initMetronome();
   initRhythm();
