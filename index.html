@@ -26,16 +26,9 @@
       <span class="tab-icon" aria-hidden="true">🎙</span>
       <span class="tab-label">解析・ログ</span>
     </button>
-    <button class="tab-btn" data-tab="pitch" role="tab" aria-selected="false">
-      <span class="tab-icon" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24">
-          <!--
-            ピッチパイプ（円盤型）
-            ・ギア外形：R_root=8, R_tip=10.5, 12歯（半歯角6°）
-            ・白抜き内円：r=5.5
-            ・12個の音穴（白）：r=6.7 に配置
-            ・中央ハブ（塗り）：r=1.5
-          -->
+    <button class="tab-btn" data-tab="main" role="tab" aria-selected="false">
+      <span class="tab-icon tab-icon-dual" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24">
           <path fill="currentColor" stroke="none" d="
             M10.75,4.10 L10.90,1.56 L13.10,1.56 L13.25,4.10
             L14.87,4.53 L16.27,2.41 L18.17,3.51 L17.03,5.78
@@ -49,9 +42,7 @@
             L4.10,13.25 L1.56,13.10 L1.56,10.90 L4.10,10.75
             L4.53,9.13 L2.41,7.73 L3.51,5.83 L5.78,6.97
             L6.97,5.78 L5.83,3.51 L7.73,2.41 L9.13,4.53 Z"/>
-          <!-- 内側くり抜き -->
           <circle cx="12" cy="12" r="5.5" fill="white"/>
-          <!-- 音穴12個（白抜き、r=6.7 に等間隔配置） -->
           <circle cx="12.00" cy="5.30"  r="0.9" fill="white"/>
           <circle cx="15.35" cy="6.20"  r="0.9" fill="white"/>
           <circle cx="17.80" cy="8.65"  r="0.9" fill="white"/>
@@ -64,21 +55,15 @@
           <circle cx="5.30"  cy="12.00" r="0.9" fill="white"/>
           <circle cx="6.20"  cy="8.65"  r="0.9" fill="white"/>
           <circle cx="8.65"  cy="6.20"  r="0.9" fill="white"/>
-          <!-- 中央ハブ -->
           <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
         </svg>
-      </span>
-      <span class="tab-label">ピッチパイプ</span>
-    </button>
-    <button class="tab-btn" data-tab="metronome" role="tab" aria-selected="false">
-      <span class="tab-icon" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="6,22 18,22 14,3 10,3"/>
           <line x1="12" y1="20" x2="16.5" y2="9"/>
           <circle cx="16" cy="9.5" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
       </span>
-      <span class="tab-label">メトロノーム</span>
+      <span class="tab-label">メイン</span>
     </button>
     <button class="tab-btn" data-tab="rhythm" role="tab" aria-selected="false">
       <span class="tab-icon" aria-hidden="true">
@@ -110,8 +95,8 @@
       </div>
     </section>
 
-    <!-- ピッチパイプ -->
-    <section id="tab-pitch" class="tab-panel" role="tabpanel">
+    <!-- メイン（ピッチパイプ + メトロノーム） -->
+    <section id="tab-main" class="tab-panel" role="tabpanel">
       <div class="panel-content">
 
         <!-- 基準周波数 -->
@@ -135,33 +120,34 @@
           <!-- JS で生成 -->
         </div>
 
-        <!-- 全音停止 -->
-        <button class="stop-notes-btn" id="stop-notes-btn">
-          <svg width="13" height="13" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true" style="flex-shrink:0"><rect x="1.5" y="1.5" width="9" height="9" rx="1"/></svg>
-          <span style="visibility:hidden">全音停止</span>
+        <!-- タップテンポ（上段：拍子 + 拍インジケーター） -->
+        <button class="card tap-card" id="tap-btn" aria-label="タップテンポ">
+          <div class="tap-top-row">
+            <select id="time-sig" class="time-sig-select" aria-label="拍子選択">
+              <option value="4">4拍子</option>
+              <option value="3">3拍子</option>
+              <option value="2">2拍子</option>
+              <option value="5">5拍子</option>
+              <option value="6">6拍子</option>
+              <option value="7">7拍子</option>
+            </select>
+            <div class="beat-indicator" id="beat-indicator" aria-live="polite" aria-label="拍インジケーター">
+              <!-- JS で生成 -->
+            </div>
+          </div>
+          <div class="tap-label-area">
+            <span class="tap-label-text">ここを叩いてテンポ入力</span>
+          </div>
+          <div class="tap-dots-row" id="tap-dots" aria-hidden="true">
+            <span class="tap-progress-dot"></span>
+            <span class="tap-progress-dot"></span>
+            <span class="tap-progress-dot"></span>
+            <span class="tap-progress-dot"></span>
+          </div>
         </button>
-      </div>
-    </section>
 
-    <!-- メトロノーム -->
-    <section id="tab-metronome" class="tab-panel" role="tabpanel">
-      <div class="panel-content">
-
-        <!-- 拍インジケーター -->
-        <div class="card beat-indicator-wrap">
-          <div class="beat-indicator" id="beat-indicator" aria-live="polite" aria-label="拍インジケーター">
-            <!-- JS で生成 -->
-          </div>
-        </div>
-
-        <!-- テンポカード（拍子 + BPM + スライダー） -->
+        <!-- BPM調整（下段） -->
         <div class="card tempo-card">
-          <div class="segment-control" id="time-sig" role="group" aria-label="拍子選択">
-            <button class="segment-btn active" data-sig="4/4">4/4</button>
-            <button class="segment-btn" data-sig="3/4">3/4</button>
-            <button class="segment-btn" data-sig="2/4">2/4</button>
-            <button class="segment-btn" data-sig="6/8">6/8</button>
-          </div>
           <div class="bpm-control">
             <button class="bpm-adj-btn" id="bpm-down-big" aria-label="BPM −10">−10</button>
             <button class="bpm-adj-btn" id="bpm-down" aria-label="BPM −1">−1</button>
@@ -177,18 +163,6 @@
             class="bpm-slider" aria-label="BPMスライダー">
         </div>
 
-        <!-- タップテンポカード -->
-        <button class="card tap-card" id="tap-btn" aria-label="タップテンポ">
-          <div class="tap-label-area">
-            <span class="tap-label-text">ここを叩いてテンポ入力</span>
-          </div>
-          <div class="tap-dots-row" id="tap-dots" aria-hidden="true">
-            <span class="tap-progress-dot"></span>
-            <span class="tap-progress-dot"></span>
-            <span class="tap-progress-dot"></span>
-            <span class="tap-progress-dot"></span>
-          </div>
-        </button>
       </div>
     </section>
 
@@ -205,6 +179,7 @@
             <button class="preset-btn" data-preset="sixteenth">♬</button>
             <button class="preset-btn" data-preset="shuffle">♩♪</button>
             <button class="preset-btn" data-preset="halftimeShuffle">½♩♪</button>
+            <button class="preset-btn" data-preset="triplet">³♪</button>
           </div>
         </div>
 

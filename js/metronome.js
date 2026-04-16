@@ -55,8 +55,8 @@ class Metronome {
   }
 
   setTimeSignature(sig) {
-    const map = { '4/4': 4, '3/4': 3, '2/4': 2, '6/8': 6 };
-    this.beatsPerMeasure = map[sig] ?? 4;
+    const beats = parseInt(sig, 10);
+    this.beatsPerMeasure = (!isNaN(beats) && beats >= 1) ? beats : 4;
     this.currentBeat = 0;
     if (this.isPlaying && this.audioContext) this._resetScheduler();
   }

@@ -97,8 +97,8 @@ function initPitchPipe() {
     const btn = document.createElement('button');
     btn.className = `note-btn${note.isSharp ? ' sharp' : ''}`;
     btn.dataset.note = note.name;
-    btn.setAttribute('aria-label', `${note.name}（${note.solfege}）`);
-    btn.innerHTML = `${note.name}<span class="note-sub">${note.solfege}</span>`;
+    btn.setAttribute('aria-label', note.name);
+    btn.innerHTML = note.name;
 
     btn.addEventListener('click', () => {
       const ctx = getAudioContext();
@@ -142,12 +142,6 @@ function initPitchPipe() {
     applyFreq((parseFloat(freqSlider.value) + 0.1).toFixed(1)));
   document.getElementById('freq-up-big').addEventListener('click', () =>
     applyFreq((parseFloat(freqSlider.value) + 1).toFixed(1)));
-
-  // 全音停止
-  document.getElementById('stop-notes-btn').addEventListener('click', () => {
-    pitchPipe.stopAll();
-    document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
-  });
 
   // 起動時にストレージの設定を適用
   const stored = getSettings();
@@ -220,15 +214,14 @@ function initMetronome() {
   document.getElementById('bpm-up-big').addEventListener('click',   () => applyBPM(metronome.bpm + 10));
 
   // 拍子選択
-  document.querySelectorAll('#time-sig .segment-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#time-sig .segment-btn')
-        .forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      metronome.setTimeSignature(btn.dataset.sig);
-      buildBeatDots(metronome.beatsPerMeasure);
-    });
+  const timeSigSelect = document.getElementById('time-sig');
+  timeSigSelect.addEventListener('change', () => {
+    metronome.setTimeSignature(timeSigSelect.value);
+    buildBeatDots(metronome.beatsPerMeasure);
   });
+  // タップ誤検知防止：select の操作をタップカードに伝播しない
+  timeSigSelect.addEventListener('mousedown', e => e.stopPropagation());
+  timeSigSelect.addEventListener('touchstart', e => e.stopPropagation(), { passive: false });
 
   // クリック音選択
   document.querySelectorAll('#metro-sound-type .segment-btn').forEach(btn => {
@@ -334,6 +327,7 @@ function initRhythm() {
     sixteenth:       [3, 6, 9],
     shuffle:         [8],
     halftimeShuffle: [4, 6, 10],
+    triplet:         [4, 8],
   };
 
   // 現在のステップ状態（0は常にtrue）
@@ -508,7 +502,7 @@ function initGlobalStop() {
 
 // ─── タブ スワイプ操作 ───────────────────────
 function initSwipe() {
-  const TABS   = ['analysis', 'pitch', 'metronome', 'rhythm'];
+  const TABS   = ['analysis', 'main', 'rhythm'];
   const content = document.querySelector('.tab-content');
   let startX = 0, startY = 0, tracking = false;
 

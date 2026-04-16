@@ -358,11 +358,11 @@ input.bpm-slider::-moz-range-track {
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 12px;
-  padding: 10px 4px;
+  padding: 6px 4px;
   font-size: 16px;
   font-weight: 700;
   color: var(--text);
-  min-height: 60px;
+  min-height: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -479,8 +479,8 @@ input.bpm-slider::-moz-range-track {
   border: 1px solid var(--border);
   background: var(--bg);
   border-radius: 9px;
-  min-width: 52px;
-  min-height: 52px;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
@@ -538,16 +538,63 @@ input.bpm-slider::-moz-range-track {
   border: 1.5px solid var(--border-strong);
   background: var(--surface);
   border-radius: 16px;
-  padding: 20px 16px 16px;
+  padding: 12px 14px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   position: relative;
   overflow: hidden;
   cursor: pointer;
   transition: background 0.12s;
   box-shadow: var(--shadow-card);
+}
+
+/* タップカード上段（拍子 select + 拍ドット） */
+.tap-top-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  pointer-events: none;
+}
+
+.tap-top-row .beat-indicator {
+  flex: 1;
+  gap: 8px;
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.time-sig-select {
+  pointer-events: auto;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a656b' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 8px center,
+    var(--bg);
+  border-radius: 9px;
+  padding: 6px 26px 6px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--text);
+  min-height: 36px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.time-sig-select:focus {
+  border-color: var(--focus);
+}
+
+/* デュアルアイコン（タブバー） */
+.tab-icon-dual {
+  display: flex;
+  gap: 3px;
+  align-items: center;
 }
 
 .tap-card:active {
