@@ -21,6 +21,8 @@ function closeSettings() {
   const screen = document.getElementById('screen-settings');
   screen.classList.remove('open');
   screen.setAttribute('aria-hidden', 'true');
+  // APIキーが保存されていれば解析タブの表示を更新する
+  if (typeof onApiKeySaved === 'function') onApiKeySaved();
 }
 
 // ─── UI をストレージの値で初期化 ─────────────

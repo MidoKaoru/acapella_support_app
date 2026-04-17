@@ -579,6 +579,20 @@ function initHamburgerMenu() {
   });
 }
 
+// ─── トースト通知（全モジュールから利用） ────────
+function showToast(message) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
 // ─── 初期化 ──────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
@@ -591,5 +605,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initHamburgerMenu();
   initLibrary();
   initSettings();
+  initAnalysis();
   registerSW();
 });

@@ -1683,6 +1683,338 @@ input.bpm-slider::-moz-range-track {
 }
 .edit-textarea:focus { border-color: var(--focus); }
 
+/* ===== 解析タブ ===== */
+
+/* APIキー未設定通知 */
+.analysis-notice {
+  text-align: center;
+  padding: 24px 16px;
+}
+.analysis-notice-text {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.analysis-notice-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+/* ファイル選択ラベル */
+.analysis-file-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-secondary);
+  background: var(--bg);
+  transition: border-color 0.15s, background 0.15s;
+  margin-bottom: 12px;
+  min-height: 48px;
+  word-break: break-all;
+}
+.analysis-file-label:hover,
+.analysis-file-label:focus-within {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--text);
+}
+
+/* 進捗インジケーター */
+.analysis-progress {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.analysis-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.analysis-step:last-child { border-bottom: none; }
+.analysis-step.running,
+.analysis-step.done { opacity: 1; }
+
+.analysis-step-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.analysis-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.analysis-step.running .analysis-step-dot {
+  background: var(--primary);
+  animation: analysisPulse 1s ease-in-out infinite;
+}
+.analysis-step.done .analysis-step-dot { background: var(--success); }
+
+@keyframes analysisPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.analysis-step-label {
+  font-size: 14px;
+  color: var(--text);
+}
+.analysis-step-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 48px;
+  text-align: right;
+}
+.analysis-step.done .analysis-step-status { color: var(--success); }
+
+/* エラー表示 */
+.analysis-error-card {
+  padding: 14px 16px;
+  background: var(--danger-light);
+  border: 1px solid var(--danger);
+}
+.analysis-error-card p {
+  font-size: 13px;
+  color: var(--danger);
+  line-height: 1.6;
+}
+
+/* 文字起こし折りたたみ */
+.analysis-transcript-wrap { padding: 0; }
+.analysis-transcript-summary {
+  display: block;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-secondary);
+}
+.analysis-transcript-summary::-webkit-details-marker { display: none; }
+.analysis-transcript-summary::before {
+  content: '▶ ';
+  font-size: 10px;
+}
+details[open] .analysis-transcript-summary::before { content: '▼ '; }
+
+.analysis-transcript-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  padding: 0 16px 16px;
+  font-family: inherit;
+  border-top: 1px solid var(--border);
+}
+
+/* セッションヘッダー */
+.analysis-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 8px;
+}
+.analysis-session-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 音源プレーヤー */
+.analysis-player-wrap { padding: 12px 16px; }
+.analysis-audio-player {
+  width: 100%;
+  height: 40px;
+}
+
+/* フィルター */
+.analysis-filters { padding: 14px 16px; }
+.analysis-filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.analysis-filter-row .control-label {
+  flex-shrink: 0;
+  padding-top: 4px;
+  width: 52px;
+}
+.analysis-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.analysis-chip {
+  padding: 4px 12px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  min-height: 30px;
+}
+.analysis-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+.analysis-clear-filter {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  text-decoration: underline;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* フィードバックカード */
+.analysis-card {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-card);
+  border-left: 4px solid var(--border-strong);
+}
+.analysis-card.high   { border-left-color: var(--danger); }
+.analysis-card.normal { border-left-color: var(--primary); }
+
+.analysis-card-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.analysis-card-text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+.analysis-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.analysis-seek-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-dark);
+  cursor: pointer;
+  transition: background 0.12s;
+  min-height: 32px;
+}
+.analysis-seek-btn:hover { background: var(--primary); color: white; }
+
+.analysis-report-btn {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  min-height: 32px;
+  transition: background 0.12s;
+}
+.analysis-report-btn:hover { background: var(--bg); }
+
+/* 空状態 */
+.analysis-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 24px 0;
+}
+
+/* 過去セッションセクション */
+.analysis-sessions-section {
+  margin-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* 誤変換報告シート内コンテンツ */
+.report-sheet-content {
+  padding: 0 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.report-sheet-title {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 12px 0 4px;
+}
+.report-field { margin: 0; }
+
+/* ghost ボタン（キャンセル用） */
+.action-btn-ghost {
+  width: 100%;
+  padding: 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.action-btn-ghost:hover { background: var(--bg); }
+
+/* トースト通知 */
+#toast {
+  position: fixed;
+  bottom: calc(var(--controller-height) + var(--safe-bottom) + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: #323232;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  white-space: nowrap;
+  z-index: 500;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* ===== デスクトップ補完 ===== */
 @media (min-width: 600px) {
   .note-grid {
