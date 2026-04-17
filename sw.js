@@ -4,7 +4,7 @@
  * オフラインキャッシュは不要のため、ネットワーク優先で動作
  */
 
-const CACHE_NAME = 'acapella-v43';
+const CACHE_NAME = 'acapella-v44';
 const CACHE_URLS = [
   './index.html',
   './style.css',
