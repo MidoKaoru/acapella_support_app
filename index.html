@@ -97,16 +97,27 @@
         <!-- 解析フォーム -->
         <div id="analysis-form" class="card control-group">
           <span class="control-label">音声ファイル</span>
-          <label class="analysis-file-label" id="analysis-file-label-el">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            <span id="analysis-file-name">ファイルを選択</span>
-            <input type="file" id="analysis-file" accept="audio/*,.m4a,.mp3,.wav,.aac,.adts" style="display:none">
-          </label>
+          <div class="analysis-file-row">
+            <label class="analysis-file-label" id="analysis-file-label-el">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span id="analysis-file-name">ファイルを選択</span>
+              <input type="file" id="analysis-file" accept="audio/*,.m4a,.mp3,.wav,.aac,.adts" style="display:none">
+            </label>
+            <button class="analysis-file-clear" id="analysis-file-clear" aria-label="選択を解除" style="display:none">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <span class="control-label">練習日</span>
+          <input type="date" id="analysis-practice-date" class="edit-text-input">
           <button class="action-btn-primary" id="analysis-start-btn" disabled>解析スタート</button>
         </div>
 
@@ -159,20 +170,6 @@
           <!-- セッションヘッダー -->
           <div class="analysis-result-header">
             <span class="analysis-session-name" id="analysis-session-name"></span>
-            <button class="library-io-btn" id="analysis-export-btn">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              エクスポート
-            </button>
-          </div>
-
-          <!-- 音源プレーヤー -->
-          <div class="card analysis-player-wrap" id="analysis-player-wrap" style="display:none">
-            <audio id="analysis-audio" controls class="analysis-audio-player"></audio>
           </div>
 
           <!-- フィルター -->
@@ -185,6 +182,16 @@
               <span class="control-label">カテゴリ</span>
               <div class="analysis-chips" id="analysis-cat-chips"></div>
             </div>
+            <div class="analysis-filter-row">
+              <span class="control-label">セクション</span>
+              <div class="analysis-chips" id="analysis-sec-chips"></div>
+            </div>
+            <div class="analysis-filter-row">
+              <span class="control-label">絞り込み</span>
+              <div class="analysis-chips">
+                <button class="analysis-chip" id="analysis-fav-filter">★ お気に入り</button>
+              </div>
+            </div>
             <button class="analysis-clear-filter" id="analysis-clear-filter" style="display:none">
               全解除
             </button>
@@ -193,12 +200,19 @@
           <!-- カード一覧 -->
           <div id="analysis-cards"></div>
 
-        </div>
+          <!-- フィードバック保存 / 共有用HTML出力 -->
+          <div class="analysis-action-row">
+            <button class="action-btn-primary" id="analysis-save-btn">フィードバックを保存</button>
+            <button class="action-btn-secondary analysis-share-action" id="analysis-share-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+              共有用HTMLを出力
+            </button>
+          </div>
 
-        <!-- 過去のセッション -->
-        <div class="analysis-sessions-section">
-          <p class="settings-section-label">過去のセッション</p>
-          <div id="analysis-sessions-list"></div>
         </div>
 
       </div>

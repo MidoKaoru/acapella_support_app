@@ -10,7 +10,6 @@
 const KEYS = {
   SONGS:     'acapella:songs',
   SETTINGS:  'acapella:settings',
-  SESSIONS:  'acapella:sessions',
   DICT:      'acapella:dict',
 };
 
@@ -71,29 +70,6 @@ function defaultSettings() {
     soundType: 'woodblock',
     apiKey:    '',
   };
-}
-
-// ─── 解析セッション ──────────────────────────
-
-/**
- * 解析セッション一覧を取得する。
- * @returns {{ sessions: Session[] }}
- */
-function getSessions() {
-  try {
-    const raw = localStorage.getItem(KEYS.SESSIONS);
-    return raw ? JSON.parse(raw) : { sessions: [] };
-  } catch {
-    return { sessions: [] };
-  }
-}
-
-/**
- * 解析セッション一覧を保存する。
- * @param {{ sessions: Session[] }} data
- */
-function saveSessions(data) {
-  localStorage.setItem(KEYS.SESSIONS, JSON.stringify(data));
 }
 
 // ─── 誤変換辞書 ──────────────────────────────

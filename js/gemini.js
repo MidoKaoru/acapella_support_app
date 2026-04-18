@@ -10,14 +10,31 @@ class GeminiAudioAnalyzer {
   constructor() {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error('Gemini APIキーが設定されていません。設定画面から登録してください。');
-    this.apiKey    = apiKey;
-    this.baseUrl   = 'https://generativelanguage.googleapis.com/v1beta';
-    this.uploadUrl = 'https://generativelanguage.googleapis.com/upload/v1beta/files';
-    this.modelName = 'gemini-2.5-flash-lite';
+    this.apiKey     = apiKey;
+    this.baseUrl    = 'https://generativelanguage.googleapis.com/v1beta';
+    this.uploadUrl  = 'https://generativelanguage.googleapis.com/upload/v1beta/files';
+    this.modelNames = [
+      'gemini-3-flash-preview',
+      'gemini-3.1-flash-lite-preview',
+      'gemini-2.5-flash',
+    ];
   }
 
   get _authHeaders() {
     return { 'x-goog-api-key': this.apiKey };
+  }
+
+  // ─── モデルフォールバック付きfetch ────────────
+
+  async _fetchForGenerate(options) {
+    for (const modelName of this.modelNames) {
+      const url = `${this.baseUrl}/models/${modelName}:generateContent`;
+      const response = await fetch(url, options);
+      if (response.ok) return response;
+      if (response.status === 429 || response.status === 503) continue;
+      throw new Error(`APIエラー [${response.status}]`);
+    }
+    throw new Error('現在AIの利用上限に達しています。しばらく経ってから再度お試しください。');
   }
 
   // ─── レスポンス安全抽出 ──────────────────────
@@ -96,7 +113,7 @@ class GeminiAudioAnalyzer {
       if (data.state === 'ACTIVE') return;
       if (data.state === 'FAILED') throw new Error('Googleサーバー側でのファイル処理に失敗しました。');
 
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 10000));
     }
     throw new Error('ファイルのアクティベーションがタイムアウトしました。');
   }
@@ -104,23 +121,20 @@ class GeminiAudioAnalyzer {
   // ─── ② 文字起こし ───────────────────────────
 
   async transcribeAudio(fileUri, mimeType) {
-    const url = `${this.baseUrl}/models/${this.modelName}:generateContent`;
     const payload = {
       contents: [{
         parts: [
-          { text: 'この音声ファイルの文字起こしをしてください。誰がどのパートを歌っているかなどの推測は不要で、聞こえた言葉をそのまま抽出してください。' },
+          { text: 'この音声ファイルの「話し声（会話）」の部分のみを正確に文字起こししてください。歌唱（コーラス、リードボーカル、ボイパなど）の部分は絶対に文字起こしに含めず、完全に無視してください。' },
           { file_data: { file_uri: fileUri, mime_type: mimeType } },
         ],
       }],
     };
 
-    const response = await fetch(url, {
+    const response = await this._fetchForGenerate({
       method:  'POST',
       headers: { ...this._authHeaders, 'Content-Type': 'application/json' },
       body:    JSON.stringify(payload),
     });
-
-    if (!response.ok) throw new Error(`文字起こし失敗 [${response.status}]`);
 
     const data    = await response.json();
     const rawText = this._extractTextFromResponse(data);
@@ -141,11 +155,17 @@ class GeminiAudioAnalyzer {
 
   // ─── ③ 構造化解析（JSON生成） ───────────────
 
-  async analyzeStructure(fileUri, mimeType, transcript) {
-    const url = `${this.baseUrl}/models/${this.modelName}:generateContent`;
-
+  async analyzeStructure(transcript) {
     const promptText = `
-あなたはプロのアカペラ指導者です。提供された音声ファイルおよびその文字起こしテキストをもとに、アカペラの練習に対するフィードバックを抽出してください。
+あなたは優秀な議事録作成アシスタントです。
+提供された文字起こしテキストをもとに、練習中のメンバー同士が口頭で行ったフィードバックや話し合いの内容のみを抽出・構造化してください。
+
+【厳守事項】
+- あなた自身が歌唱を評価したり、新しいアドバイスを捏造することは固く禁じます。
+- メンバーが実際に発言した内容（指摘・決定事項・反省点）だけを抽出してください。
+- 誰が誰に向けて言ったか（対象パート）と、何についての指摘か（カテゴリ）を必ず分類してください。
+- 会話の文脈から、曲のどの部分についての指摘かを抽出し \`section\` に格納すること。フィルターの選択肢が増えすぎるのを防ぐため、表記揺れを極力なくし、「Aメロ」「Bメロ」「1サビ」「ラスサビ」「イントロ」「アウトロ」「全体」「不明」のように短く統一感のある名称で出力すること。
+- 「セクション」の分類は、必ず文字起こしテキストの「会話の文脈（言葉）」からのみ推測すること。テキストの文脈から明確に判断できない場合は直ちに「全体」として出力すること。
 
 【文字起こしテキスト】
 ${transcript}
@@ -163,13 +183,13 @@ ${transcript}
             type: 'OBJECT',
             properties: {
               id:            { type: 'STRING' },
-              timestamp_sec: { type: 'INTEGER' },
+              section:       { type: 'STRING' },
               part:          { type: 'ARRAY', items: { type: 'STRING' } },
               category:      { type: 'STRING', enum: ['ピッチ', 'リズム', 'ダイナミクス', '歌詞・発音', 'その他'] },
               importance:    { type: 'STRING', enum: ['high', 'normal'] },
               text:          { type: 'STRING' },
             },
-            required: ['id', 'timestamp_sec', 'part', 'category', 'importance', 'text'],
+            required: ['id', 'section', 'part', 'category', 'importance', 'text'],
           },
         },
       },
@@ -180,7 +200,6 @@ ${transcript}
       contents: [{
         parts: [
           { text: promptText },
-          { file_data: { file_uri: fileUri, mime_type: mimeType } },
         ],
       }],
       generationConfig: {
@@ -190,13 +209,11 @@ ${transcript}
       },
     };
 
-    const response = await fetch(url, {
+    const response = await this._fetchForGenerate({
       method:  'POST',
       headers: { ...this._authHeaders, 'Content-Type': 'application/json' },
       body:    JSON.stringify(payload),
     });
-
-    if (!response.ok) throw new Error(`構造化解析失敗 [${response.status}]`);
 
     const data       = await response.json();
     const jsonString = this._extractTextFromResponse(data);
