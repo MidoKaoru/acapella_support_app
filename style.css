@@ -1472,6 +1472,7 @@ input.bpm-slider::-moz-range-track {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  justify-content: flex-end;
 }
 .detail-info-label {
   font-size: 11px;
@@ -1882,13 +1883,17 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
 }
 .analysis-chips {
   display: flex;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
+  flex-wrap: nowrap;
   gap: 6px;
   scrollbar-width: none;
 }
 .analysis-chips::-webkit-scrollbar { display: none; }
 #analysis-practice-date {
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
@@ -1903,6 +1908,8 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
   cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
   min-height: 30px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .analysis-chip.active {
   background: var(--primary);

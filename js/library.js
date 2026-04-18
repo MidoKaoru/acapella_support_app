@@ -380,7 +380,7 @@ function _renderSongs(content, groupId) {
     html += '<div class="library-list">';
     sorted.forEach((s, idx) => {
       const keysStr  = s.keys.length ? s.keys.join(' / ') : 'キーなし';
-      const meta     = `${keysStr}　${s.bpm} BPM　${parseFloat(s.baseFreq).toFixed(1)} Hz`;
+      const meta     = `${keysStr}　${s.bpm} BPM　${parseFloat(s.baseFreq).toFixed(1)} Hz　${s.timeSig || 4}拍子`;
       const showMove = _songSort === 'manual' && sorted.length >= 2 && _isSongSortEditing;
       const moveBtns = showMove ? `
         <div class="library-card-sort-col">
@@ -502,6 +502,10 @@ function _renderDetail(content, groupId, songId) {
           <span class="detail-info-item">
             <span class="detail-info-label">基準周波数</span>
             <span class="detail-info-value">${parseFloat(song.baseFreq).toFixed(1)} Hz</span>
+          </span>
+          <span class="detail-info-item">
+            <span class="detail-info-label">拍子</span>
+            <span class="detail-info-value">${song.timeSig || 4}拍子</span>
           </span>
         </div>
         ${song.notes ? `<p class="detail-notes">${_esc(song.notes)}</p>` : ''}
@@ -668,7 +672,7 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
-          共有用HTMLを出力
+          共有する
         </button>
       </div>
       ${transcriptHtml}
@@ -676,9 +680,13 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
       <div class="session-detail-cards" id="lib-session-cards"></div>
     </div>`;
 
-  // 共有用HTML出力
+  // 共有
   content.querySelector('#lib-share-btn').addEventListener('click', () => {
-    exportShareHtml(session);
+    if (navigator.share) {
+      _libShareAsText(session);
+    } else {
+      exportShareHtml(session);
+    }
   });
 
   // セッション名のインライン編集
@@ -884,6 +892,29 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
   renderLibCards();
 }
 
+// ─── ライブラリ共有（テキスト） ──────────────────
+
+async function _libShareAsText(session) {
+  const cards = session.cards || [];
+  const name  = session.session_name || 'セッション';
+  const date  = session.practice_date
+    ? session.practice_date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日')
+    : session.recorded_at || '';
+
+  const lines = [`【${name}】${date ? ' ' + date : ''}`, ''];
+  cards.forEach(card => {
+    lines.push(`▶ ${card.section || ''} ｜ ${(card.part || []).join(' / ')} ｜ ${card.category || ''}`);
+    lines.push(card.text || '');
+    lines.push('');
+  });
+
+  try {
+    await navigator.share({ title: name, text: lines.join('\n') });
+  } catch (e) {
+    if (e.name !== 'AbortError') showToast('共有に失敗しました');
+  }
+}
+
 // ─── ピッチパイプ再生・停止 ─────────────────────
 
 function _playPitch(song) {
@@ -910,11 +941,15 @@ function _stopPitch() {
 
 function _playMetro(song, bpm) {
   const actualBpm = bpm ?? song.bpm;
+  const ts = song.timeSig || 4;
   const ctx = getAudioContext();
   if (metronome.isPlaying) metronome.stop();
   metronome.setAudioContext(ctx);
   metronome.setBPM(actualBpm);
-  metronome.setSubdivisionSteps([]); // 裏拍をリセットして表拍のみ鳴らす
+  metronome.setTimeSignature(String(ts));
+  document.getElementById('time-sig').value = String(ts);
+  buildBeatDots(metronome.beatsPerMeasure);
+  metronome.setSubdivisionSteps([]);
   const bpmVal = String(actualBpm);
   document.getElementById('bpm-input').value        = bpmVal;
   document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(actualBpm));
@@ -957,15 +992,18 @@ function _renderEdit(content, groupId, songId, snapshot) {
 
   if (song) {
     _editDraft = { title: song.title, keys: [...song.keys], bpm: song.bpm,
-                   baseFreq: song.baseFreq, notes: song.notes ?? '' };
+                   baseFreq: song.baseFreq, notes: song.notes ?? '',
+                   timeSig: song.timeSig ?? 4 };
   } else if (snapshot) {
     // 「今の状態を保存」から開いた場合：キャプチャ値を初期値に使う
     _editDraft = { title: '', keys: [...snapshot.keys], bpm: snapshot.bpm,
-                   baseFreq: snapshot.baseFreq, notes: '' };
+                   baseFreq: snapshot.baseFreq, notes: '',
+                   timeSig: snapshot.timeSig ?? 4 };
     _pendingSnapshot = null;
   } else {
     _editDraft = { title: '', keys: [], bpm: 120,
-                   baseFreq: getSettings().baseFreq, notes: '' };
+                   baseFreq: getSettings().baseFreq, notes: '',
+                   timeSig: 4 };
   }
 
   content.innerHTML = `
@@ -979,6 +1017,18 @@ function _renderEdit(content, groupId, songId, snapshot) {
       <div class="card control-group">
         <span class="control-label">キー音（複数選択可）</span>
         <div class="edit-note-grid" id="edit-note-grid"></div>
+      </div>
+
+      <div class="card control-group">
+        <span class="control-label">拍子</span>
+        <select id="edit-time-sig" class="sort-select" aria-label="拍子選択">
+          <option value="2"${_editDraft.timeSig === 2 ? ' selected' : ''}>2拍子</option>
+          <option value="3"${_editDraft.timeSig === 3 ? ' selected' : ''}>3拍子</option>
+          <option value="4"${_editDraft.timeSig === 4 ? ' selected' : ''}>4拍子</option>
+          <option value="5"${_editDraft.timeSig === 5 ? ' selected' : ''}>5拍子</option>
+          <option value="6"${_editDraft.timeSig === 6 ? ' selected' : ''}>6拍子</option>
+          <option value="7"${_editDraft.timeSig === 7 ? ' selected' : ''}>7拍子</option>
+        </select>
       </div>
 
       <div class="card bpm-control">
@@ -1045,6 +1095,11 @@ function _buildEditNoteGrid() {
 }
 
 function _bindEditEvents(groupId, songId) {
+  // 拍子
+  document.getElementById('edit-time-sig').addEventListener('change', e => {
+    _editDraft.timeSig = parseInt(e.target.value, 10);
+  });
+
   // BPM
   const bpmInput = document.getElementById('edit-bpm');
   const _applyBpm = v => {
@@ -1092,7 +1147,11 @@ function _bindEditEvents(groupId, songId) {
       if (metronome.isPlaying) metronome.stop();
       metronome.setAudioContext(ctx);
       metronome.setBPM(_editDraft.bpm);
-      metronome.setSubdivisionSteps([]); // 裏拍をリセットして表拍のみ鳴らす
+      const _ts = _editDraft.timeSig || 4;
+      metronome.setTimeSignature(String(_ts));
+      document.getElementById('time-sig').value = String(_ts);
+      buildBeatDots(metronome.beatsPerMeasure);
+      metronome.setSubdivisionSteps([]);
       const bpmVal = String(_editDraft.bpm);
       document.getElementById('bpm-input').value        = bpmVal;
       document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(_editDraft.bpm));

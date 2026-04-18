@@ -37,6 +37,9 @@ function getAudioContext() {
 const pitchPipe = new PitchPipe();
 const metronome = new Metronome();
 
+// ─── ビートドット描画（library.js からも利用） ──
+let buildBeatDots = () => {};
+
 // ─── タブ管理 ────────────────────────────────
 let _animatingPanel = null;
 
@@ -180,8 +183,8 @@ function initMetronome() {
     bottomBpm.textContent = bpm;
   }
 
-  // 拍ドット を再描画
-  function buildBeatDots(count) {
+  // 拍ドット を再描画（グローバル変数に代入してlibrary.jsからも呼べるようにする）
+  buildBeatDots = function(count) {
     beatIndicator.innerHTML = '';
     for (let i = 0; i < count; i++) {
       const dot = document.createElement('div');
@@ -189,7 +192,7 @@ function initMetronome() {
       dot.dataset.beat = i;
       beatIndicator.appendChild(dot);
     }
-  }
+  };
 
   // メトロノームからの拍コールバック → 対応ドットを点灯
   metronome.onBeat = (beatIndex) => {
@@ -464,9 +467,10 @@ function initSaveState() {
     const activeKeys = Array.from(document.querySelectorAll('.note-btn.active'))
       .map(btn => btn.dataset.note);
 
-    // 現在のBPM・基準周波数を取得
-    const bpm     = metronome.bpm;
+    // 現在のBPM・基準周波数・拍子を取得
+    const bpm      = metronome.bpm;
     const baseFreq = pitchPipe.baseFreq;
+    const timeSig  = parseInt(document.getElementById('time-sig').value, 10) || 4;
 
     // メトロノーム停止
     if (metronome.isPlaying) {
@@ -480,7 +484,7 @@ function initSaveState() {
     document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
 
     // ライブラリの編集画面を新規追加モードで開く（初期値をキャプチャした状態で）
-    openLibraryNewSong({ keys: activeKeys, bpm, baseFreq });
+    openLibraryNewSong({ keys: activeKeys, bpm, baseFreq, timeSig });
   });
 }
 

@@ -126,12 +126,7 @@ function initAnalysis() {
     openLibrarySessionDetail(gId, sId, sessionId);
   });
 
-  const shareBtn = document.getElementById('analysis-share-btn');
-  if (navigator.share) {
-    const textNode = [...shareBtn.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
-    if (textNode) textNode.textContent = '共有する';
-  }
-  shareBtn.addEventListener('click', () => {
+  document.getElementById('analysis-share-btn').addEventListener('click', () => {
     if (!_currentResult) return;
     if (navigator.share) {
       _shareAsText(_currentResult);
