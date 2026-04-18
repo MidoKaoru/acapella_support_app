@@ -1467,12 +1467,12 @@ input.bpm-slider::-moz-range-track {
 .detail-info-row {
   display: flex;
   gap: 20px;
+  align-items: flex-end;
 }
 .detail-info-item {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  justify-content: flex-end;
 }
 .detail-info-label {
   font-size: 11px;
@@ -1892,9 +1892,15 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
 }
 .analysis-chips::-webkit-scrollbar { display: none; }
 #analysis-practice-date {
+  display: block;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  margin: 0;
+  padding: 6px 8px;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .analysis-chip {
