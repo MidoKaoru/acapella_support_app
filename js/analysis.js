@@ -172,7 +172,7 @@ function _updateStartBtn() {
     btn.textContent = 'オフラインのため解析不可';
     btn.disabled    = true;
   } else if (!_audioFile) {
-    btn.textContent = '音声ファイルをアップロードしてください';
+    btn.textContent = '音声ファイルを選択';
     btn.disabled    = true;
   } else {
     btn.textContent = '解析スタート';
