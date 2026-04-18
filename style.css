@@ -1464,27 +1464,29 @@ input.bpm-slider::-moz-range-track {
   font-size: 14px;
   color: var(--text-secondary);
 }
-.detail-info-row {
+.detail-info-cols {
   display: flex;
-  gap: 20px;
-  align-items: flex-end;
+  gap: 24px;
+  align-items: flex-start;
 }
-.detail-info-item {
+.detail-info-col {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 .detail-info-label {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: 0.5px;
+  line-height: 1;
 }
 .detail-info-value {
   font-size: 20px;
   font-weight: 700;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .detail-bpm-section {
   display: flex;

@@ -498,15 +498,15 @@ function _renderDetail(content, groupId, songId) {
             <button class="detail-bpm-reset" id="detail-bpm-reset" aria-label="元のBPMに戻す">↺</button>
           </div>
         </div>
-        <div class="detail-info-row">
-          <span class="detail-info-item">
+        <div class="detail-info-cols">
+          <div class="detail-info-col">
             <span class="detail-info-label">基準周波数</span>
             <span class="detail-info-value">${parseFloat(song.baseFreq).toFixed(1)} Hz</span>
-          </span>
-          <span class="detail-info-item">
+          </div>
+          <div class="detail-info-col">
             <span class="detail-info-label">拍子</span>
             <span class="detail-info-value">${song.timeSig || 4}拍子</span>
-          </span>
+          </div>
         </div>
         ${song.notes ? `<p class="detail-notes">${_esc(song.notes)}</p>` : ''}
       </div>
