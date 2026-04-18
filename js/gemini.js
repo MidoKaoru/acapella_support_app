@@ -14,9 +14,9 @@ class GeminiAudioAnalyzer {
     this.baseUrl    = 'https://generativelanguage.googleapis.com/v1beta';
     this.uploadUrl  = 'https://generativelanguage.googleapis.com/upload/v1beta/files';
     this.modelNames = [
+      'gemini-2.5-flash',
       'gemini-3-flash-preview',
       'gemini-3.1-flash-lite-preview',
-      'gemini-2.5-flash',
     ];
   }
 

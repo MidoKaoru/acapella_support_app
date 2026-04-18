@@ -1868,7 +1868,7 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
 }
 
 /* フィルター */
-.analysis-filters { padding: 14px 16px; }
+.analysis-filters { padding: 14px 16px; margin-bottom: 16px; }
 .analysis-filter-row {
   display: flex;
   align-items: flex-start;
@@ -1882,9 +1882,16 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
 }
 .analysis-chips {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
   gap: 6px;
+  scrollbar-width: none;
 }
+.analysis-chips::-webkit-scrollbar { display: none; }
+#analysis-practice-date {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .analysis-chip {
   padding: 4px 12px;
   border: 1.5px solid var(--border-strong);
@@ -2236,6 +2243,7 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
   background: var(--primary-light);
   border: 1.5px solid var(--primary);
   box-shadow: none;
+  flex-shrink: 0;
 }
 
 /* ===== デスクトップ補完 ===== */

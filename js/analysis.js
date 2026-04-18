@@ -126,9 +126,18 @@ function initAnalysis() {
     openLibrarySessionDetail(gId, sId, sessionId);
   });
 
-  document.getElementById('analysis-share-btn').addEventListener('click', () => {
+  const shareBtn = document.getElementById('analysis-share-btn');
+  if (navigator.share) {
+    const textNode = [...shareBtn.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
+    if (textNode) textNode.textContent = '共有する';
+  }
+  shareBtn.addEventListener('click', () => {
     if (!_currentResult) return;
-    exportShareHtml({ ..._currentResult, transcript: _currentTranscript });
+    if (navigator.share) {
+      _shareAsText(_currentResult);
+    } else {
+      exportShareHtml({ ..._currentResult, transcript: _currentTranscript });
+    }
   });
 }
 
@@ -152,19 +161,9 @@ function _startAnalysis() {
   else if (!_dateInput.value)            _validMsg = '練習日を入力してください';
 
   if (_validMsg) {
-    const _sb = document.getElementById('analysis-start-btn');
-    let _errEl = document.getElementById('analysis-start-error');
-    if (!_errEl) {
-      _errEl = document.createElement('p');
-      _errEl.id = 'analysis-start-error';
-      _errEl.style.cssText = 'color:var(--danger);font-size:13px;margin-top:-4px;';
-      _sb.insertAdjacentElement('afterend', _errEl);
-    }
-    _errEl.textContent = _validMsg;
-    setTimeout(() => { document.getElementById('analysis-start-error')?.remove(); }, 4000);
+    showToast(_validMsg);
     return;
   }
-  document.getElementById('analysis-start-error')?.remove();
 
   if (!getApiKey()) { _checkApiKey(); return; }
 
@@ -309,8 +308,12 @@ async function _runAnalysis(groupId, songId) {
     return;
   }
 
+  let wakeLock = null;
   let transcript = '';
   try {
+    if (navigator.wakeLock) {
+      try { wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
+    }
     _setStepStatus('uploading', 'running');
     const { fileUri, mimeType, fileName } = await analyzer.uploadAudioFile(_audioFile);
     uploadedFileName = fileName;
@@ -341,6 +344,7 @@ async function _runAnalysis(groupId, songId) {
     _setState('error');
     _showError(err.message);
   } finally {
+    if (wakeLock) { try { await wakeLock.release(); } catch (_) {} }
     if (uploadedFileName) {
       try { await analyzer.deleteFile(uploadedFileName); } catch (_) {}
     }
@@ -577,6 +581,29 @@ function _renderCards(cards) {
   });
 }
 
+// ─── ネイティブ共有（テキスト） ──────────────────
+
+async function _shareAsText(result) {
+  const cards = result.cards || [];
+  const name  = result.session_name || 'セッション';
+  const date  = result.practice_date
+    ? result.practice_date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1年$2月$3日')
+    : result.recorded_at || '';
+
+  const lines = [`【${name}】${date ? ' ' + date : ''}`, ''];
+  cards.forEach(card => {
+    lines.push(`▶ ${card.section} ｜ ${(card.part || []).join(' / ')} ｜ ${card.category}`);
+    lines.push(card.text || '');
+    lines.push('');
+  });
+
+  try {
+    await navigator.share({ title: name, text: lines.join('\n') });
+  } catch (e) {
+    if (e.name !== 'AbortError') showToast('共有に失敗しました');
+  }
+}
+
 // ─── 共有用 HTML エクスポート ─────────────────────
 
 async function exportShareHtml(sessionData) {
@@ -803,9 +830,9 @@ function _saveSession(result, transcript, groupId, songId) {
   const session = {
     id:           sessionId,
     recorded_at:  _jstDateString(),
-    transcript:   transcript || result.transcript || '',
     ...result,
     practice_date: document.getElementById('analysis-practice-date')?.value || '',
+    transcript:   '',
   };
   song.sessions.unshift(session);
   saveSongs(data);
