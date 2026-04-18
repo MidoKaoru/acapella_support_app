@@ -222,18 +222,16 @@ function _showDemoSession() {
   banner.className = 'card analysis-notice analysis-notice--demo';
   banner.innerHTML = `
     <p class="analysis-notice-text">⚠️ これはサンプルデータです</p>
-    <p class="analysis-notice-sub">
-      APIキーを設定すると、自分たちの練習音源を解析できます。
-    </p>
+    <p class="analysis-notice-sub">APIキー設定で練習音源を解析！</p>
     <ol class="onboarding-steps">
       <li><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> を開く</li>
       <li>Googleアカウントにログイン</li>
-      <li>[APIキーを作成] &gt; [キーを作成] &gt; APIキーをコピー</li>
+      <li>[APIキーを作成] &gt; [キーを作成] &gt; コピー</li>
       <li>設定画面に貼り付けて完了</li>
     </ol>
     <div class="onboarding-reassurance">
-      <span>💳 カード登録不要</span>
-      <span>🔒 この端末にのみ保存</span>
+      <span>💳 クレカ不要</span>
+      <span>🔒 端末内保存</span>
       <span>¥ 無料</span>
     </div>
     <button class="action-btn-primary" id="demo-open-settings">
