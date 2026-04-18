@@ -204,10 +204,7 @@ function initSettings() {
   document.getElementById('settings-api-key').addEventListener('input', (e) => {
     const val      = e.target.value.trim();
     const statusEl = document.getElementById('settings-api-status');
-    if (val && !val.startsWith('AIza')) {
-      statusEl.textContent = '⚠️ Gemini APIキーは「AIza」で始まります';
-      statusEl.className   = 'settings-api-status error';
-    } else if (val.length > 0 && val.length < 30) {
+    if (val.length > 0 && val.length < 30) {
       statusEl.textContent = '⚠️ キーが短すぎます（通常39文字）';
       statusEl.className   = 'settings-api-status error';
     } else {
