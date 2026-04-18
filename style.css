@@ -1082,20 +1082,27 @@ input.bpm-slider::-moz-range-track {
   text-align: center;
 }
 
+.settings-api-status:empty {
+  display: none;
+}
+
 .settings-api-status.success { color: var(--success); }
 .settings-api-status.error   { color: var(--danger);  }
 
-.settings-api-guide {
+.settings-api-guide-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   font-size: 13px;
-  color: var(--text-secondary);
-  margin-top: 10px;
-  line-height: 1.5;
-}
-
-.settings-api-guide a {
+  font-weight: 600;
   color: var(--text);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
+  background: var(--bg);
 }
 
 /* ===== ハンバーガーメニュー ===== */
@@ -1705,6 +1712,82 @@ input.bpm-slider::-moz-range-track {
   margin-bottom: 16px;
 }
 
+/* オフライン警告 */
+.analysis-notice--offline {
+  border: 1px solid rgba(180, 120, 0, 0.35);
+  background: rgba(255, 180, 0, 0.07);
+}
+.analysis-notice--offline .analysis-notice-text {
+  color: #8a6000;
+}
+.analysis-notice--offline .analysis-notice-sub {
+  color: rgba(8, 19, 26, 0.55);
+  margin-bottom: 0;
+}
+
+/* ── APIキーオンボーディング ─────────────────── */
+.onboarding-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.onboarding-lead {
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.onboarding-steps {
+  font-size: 0.85rem;
+  padding-left: 2em;
+  margin: 0 0 14px;
+  line-height: 2;
+  text-align: left;
+}
+
+.onboarding-reassurance {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.onboarding-reassurance span {
+  font-size: 0.75rem;
+  background: var(--color-surface-2, #f0f0f0);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+/* 貼り付けボタン */
+.settings-api-paste-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+/* 解析スタートボタン無効状態 */
+.action-btn-primary:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+#analysis-start-btn {
+  margin-top: 8px;
+}
+
 /* ファイル選択エリア */
 .analysis-file-row {
   display: flex;
@@ -1826,6 +1909,9 @@ input.bpm-slider::-moz-range-track {
   font-size: 13px;
   color: var(--danger);
   line-height: 1.6;
+}
+.analysis-retry-btn {
+  margin-top: 10px;
 }
 
 /* 文字起こし折りたたみ */

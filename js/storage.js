@@ -33,7 +33,11 @@ function getSongs() {
  * @param {{ groups: Group[] }} data
  */
 function saveSongs(data) {
-  localStorage.setItem(KEYS.SONGS, JSON.stringify(data));
+  try {
+    localStorage.setItem(KEYS.SONGS, JSON.stringify(data));
+  } catch (e) {
+    throw e;
+  }
 }
 
 // ─── 設定 ────────────────────────────────────
@@ -113,4 +117,19 @@ function saveApiKey(key) {
   const settings = getSettings();
   settings.apiKey = key;
   saveSettings(settings);
+}
+
+// ─── 容量チェック ─────────────────────────────────
+
+/**
+ * localStorage の合計使用量が 4.5MB（4,500,000文字）を超えているか判定する。
+ * @returns {boolean}
+ */
+function isStorageNearingLimit() {
+  let total = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const val = localStorage.getItem(localStorage.key(i));
+    if (val) total += val.length;
+  }
+  return total > 4_500_000;
 }

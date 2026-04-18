@@ -145,7 +145,7 @@ async function _saveAndTestApiKey() {
       `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`
     );
     if (res.ok) {
-      statusEl.textContent = '接続成功 ✓';
+      statusEl.textContent = '🎉 設定完了！「ふりかえり」が使えるようになりました';
       statusEl.className   = 'settings-api-status success';
     } else {
       statusEl.textContent = `キーが無効です（${res.status}）`;
@@ -197,6 +197,37 @@ function initSettings() {
     } else {
       input.type   = 'password';
       btn.textContent = '表示';
+    }
+  });
+
+  // APIキー リアルタイムバリデーション
+  document.getElementById('settings-api-key').addEventListener('input', (e) => {
+    const val      = e.target.value.trim();
+    const statusEl = document.getElementById('settings-api-status');
+    if (val && !val.startsWith('AIza')) {
+      statusEl.textContent = '⚠️ Gemini APIキーは「AIza」で始まります';
+      statusEl.className   = 'settings-api-status error';
+    } else if (val.length > 0 && val.length < 30) {
+      statusEl.textContent = '⚠️ キーが短すぎます（通常39文字）';
+      statusEl.className   = 'settings-api-status error';
+    } else {
+      statusEl.textContent = '';
+      statusEl.className   = 'settings-api-status';
+    }
+  });
+
+  // 貼り付けボタン（失敗時は入力欄にフォーカスしてCtrl+Vを促す）
+  document.getElementById('settings-api-paste')?.addEventListener('click', async () => {
+    const input    = document.getElementById('settings-api-key');
+    const statusEl = document.getElementById('settings-api-status');
+    try {
+      const text = await navigator.clipboard.readText();
+      input.value = text.trim();
+      input.dispatchEvent(new Event('input'));
+    } catch {
+      input.focus();
+      statusEl.textContent = 'Ctrl+V（Mac：⌘V）で貼り付けてください';
+      statusEl.className   = 'settings-api-status';
     }
   });
 

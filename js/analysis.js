@@ -23,6 +23,9 @@ let _pendingSongId    = null;   // 保存対象曲ID
 let _audioFile        = null;   // 選択中の音声ファイル
 let _activeFilters    = { parts: [], categories: [], sections: [], favorite: false };
 let _pendingAnalysis  = false;  // 曲0件で解析スタートした際の解析待ちフラグ
+let _chunks           = [];    // ファイルスライスチャンク配列
+let _chunkTranscripts = [];    // チャンクごとの文字起こし
+let _failedChunkIndex = -1;    // エラーが発生したチャンクのインデックス
 
 // ─── チップ・カードのソート順定義 ──────────────
 
@@ -66,6 +69,9 @@ function initAnalysis() {
 
   _checkApiKey();
 
+  window.addEventListener('online',  _updateConnectivityUI);
+  window.addEventListener('offline', _updateConnectivityUI);
+
   const fileInput = document.getElementById('analysis-file');
   const startBtn  = document.getElementById('analysis-start-btn');
   const fileLabel = document.getElementById('analysis-file-name');
@@ -86,7 +92,7 @@ function initAnalysis() {
   fileInput.addEventListener('change', () => {
     _audioFile = fileInput.files[0] || null;
     fileLabel.textContent = _audioFile ? _audioFile.name : 'ファイルを選択';
-    startBtn.disabled = !_audioFile;
+    _updateStartBtn();
     fileClearBtn.style.display = _audioFile ? 'flex' : 'none';
   });
 
@@ -94,7 +100,7 @@ function initAnalysis() {
     _audioFile = null;
     fileInput.value = '';
     fileLabel.textContent = 'ファイルを選択';
-    startBtn.disabled = true;
+    _updateStartBtn();
     fileClearBtn.style.display = 'none';
   });
 
@@ -136,14 +142,50 @@ function initAnalysis() {
   });
 }
 
+function _updateConnectivityUI() {
+  const hasKey    = !!getApiKey();
+  const noKeyEl   = document.getElementById('analysis-no-key');
+  const offlineEl = document.getElementById('analysis-offline');
+  const formEl    = document.getElementById('analysis-form');
+
+  if (!hasKey) {
+    noKeyEl.style.display   = 'block';
+    offlineEl.style.display = 'none';
+    formEl.style.display    = 'none';
+  } else if (!navigator.onLine) {
+    noKeyEl.style.display   = 'none';
+    offlineEl.style.display = 'block';
+    formEl.style.display    = 'block';
+    _updateStartBtn();
+  } else {
+    noKeyEl.style.display   = 'none';
+    offlineEl.style.display = 'none';
+    formEl.style.display    = 'block';
+    _updateStartBtn();
+  }
+}
+
+function _updateStartBtn() {
+  const btn = document.getElementById('analysis-start-btn');
+  if (!btn) return;
+  if (!navigator.onLine) {
+    btn.textContent = 'オフラインのため解析不可';
+    btn.disabled    = true;
+  } else if (!_audioFile) {
+    btn.textContent = '音声ファイルをアップロードしてください';
+    btn.disabled    = true;
+  } else {
+    btn.textContent = '解析スタート';
+    btn.disabled    = false;
+  }
+}
+
 function _checkApiKey() {
-  const hasKey = !!getApiKey();
-  document.getElementById('analysis-no-key').style.display = hasKey ? 'none'  : 'block';
-  document.getElementById('analysis-form').style.display   = hasKey ? 'block' : 'none';
+  _updateConnectivityUI();
 }
 
 function onApiKeySaved() {
-  _checkApiKey();
+  _updateConnectivityUI();
 }
 
 // ─── 曲選択ボトムシート（2段階） ────────────────────
@@ -162,6 +204,11 @@ function _startAnalysis() {
 
   if (!getApiKey()) { _checkApiKey(); return; }
 
+  if (isStorageNearingLimit()) {
+    _openStorageLimitSheet();
+    return;
+  }
+
   const data = getSongs();
   if (data.groups.length === 0) {
     _pendingAnalysis = true;
@@ -170,6 +217,84 @@ function _startAnalysis() {
   }
 
   _openGroupSelectSheet();
+}
+
+// ─── 容量超過警告ボトムシート ─────────────────────
+
+function _openStorageLimitSheet() {
+  document.getElementById('storage-limit-sheet')?.remove();
+  document.getElementById('storage-limit-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'storage-limit-overlay';
+  overlay.className = 'menu-overlay open';
+  overlay.setAttribute('aria-hidden', 'true');
+
+  const sheet = document.createElement('div');
+  sheet.id        = 'storage-limit-sheet';
+  sheet.className = 'menu-sheet open';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-label', '容量の上限が近づいています');
+
+  sheet.innerHTML = `
+    <div class="menu-sheet-handle"></div>
+    <div class="report-sheet-content">
+      <h3 class="report-sheet-title">容量の上限が近づいています</h3>
+      <p style="font-size:14px;line-height:1.6;color:var(--text-secondary);margin:0 0 16px;">データ容量が4.5MBを超過しました。新しく解析を行うには古いデータの削除が必要です。削除したくない場合は、ライブラリ画面から「エクスポート」を実行してデータを退避させてください。</p>
+      <button class="action-btn-danger" id="storage-limit-delete">半年以上前の履歴を一括削除</button>
+      <button class="action-btn-ghost"  id="storage-limit-cancel">キャンセル</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+
+  const close = () => {
+    document.getElementById('storage-limit-sheet')?.remove();
+    document.getElementById('storage-limit-overlay')?.remove();
+  };
+
+  overlay.addEventListener('click', close);
+  sheet.querySelector('#storage-limit-cancel').addEventListener('click', close);
+  sheet.querySelector('#storage-limit-delete').addEventListener('click', () => {
+    _deleteOldSessions(close);
+  });
+}
+
+function _deleteOldSessions(closeSheet) {
+  const cutoff = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+
+  const data = getSongs();
+  let deletedCount = 0;
+
+  for (const group of data.groups) {
+    for (const song of group.songs || []) {
+      if (!Array.isArray(song.sessions)) continue;
+      const before = song.sessions.length;
+      song.sessions = song.sessions.filter(session => {
+        const date = _parseSessionDate(session);
+        if (!date) return true;
+        return date >= cutoff;
+      });
+      deletedCount += before - song.sessions.length;
+    }
+  }
+
+  saveSongs(data);
+  closeSheet();
+  showToast(`${deletedCount}件の解析履歴を削除しました`);
+}
+
+function _parseSessionDate(session) {
+  if (session.practice_date) {
+    const d = new Date(session.practice_date);
+    if (!isNaN(d)) return d;
+  }
+  if (session.recorded_at) {
+    const m = session.recorded_at.match(/(\d{4})年(\d{2})月(\d{2})日/);
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+  }
+  return null;
 }
 
 function _openGroupSelectSheet() {
@@ -291,9 +416,19 @@ async function _runAnalysis(groupId, songId) {
   document.getElementById('analysis-transcript-wrap').style.display = 'none';
   _activeFilters = { parts: [], categories: [], sections: [], favorite: false };
 
-  _setState('uploading');
+  const CHUNK_SIZE = 25 * 1024 * 1024; // 25MB
+  _chunks = [];
+  for (let offset = 0; offset < _audioFile.size; offset += CHUNK_SIZE) {
+    _chunks.push(_audioFile.slice(offset, Math.min(offset + CHUNK_SIZE, _audioFile.size)));
+  }
+  _chunkTranscripts = new Array(_chunks.length).fill(null);
+  _failedChunkIndex = -1;
 
-  let uploadedFileName = null;
+  await _processChunksFrom(0);
+}
+
+async function _processChunksFrom(startIndex) {
+  const total = _chunks.length;
   let analyzer;
   try {
     analyzer = new GeminiAudioAnalyzer();
@@ -304,46 +439,65 @@ async function _runAnalysis(groupId, songId) {
   }
 
   let wakeLock = null;
-  let transcript = '';
   try {
     if (navigator.wakeLock) {
       try { wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
     }
-    _setStepStatus('uploading', 'running');
-    const { fileUri, mimeType, fileName } = await analyzer.uploadAudioFile(_audioFile);
-    uploadedFileName = fileName;
-    _setStepStatus('uploading', 'done');
 
-    _setState('waiting');
-    _setStepStatus('waiting', 'running');
-    await analyzer.waitForFileActive(fileName);
-    _setStepStatus('waiting', 'done');
+    for (let i = startIndex; i < total; i++) {
+      const chunkLabel = total > 1 ? `(${i + 1}/${total})` : null;
+      let uploadedFileName = null;
 
-    _setState('transcribing');
-    _setStepStatus('transcribing', 'running');
-    transcript = await analyzer.transcribeAudio(fileUri, mimeType);
-    _setStepStatus('transcribing', 'done');
-    _showTranscript(transcript);
+      try {
+        _setState('uploading');
+        _setStepStatus('uploading', 'running', chunkLabel);
+        const chunkFile = new File([_chunks[i]], _audioFile.name, { type: _audioFile.type });
+        const { fileUri, mimeType, fileName } = await analyzer.uploadAudioFile(chunkFile);
+        uploadedFileName = fileName;
+        _setStepStatus('uploading', 'done', chunkLabel);
+
+        _setState('waiting');
+        _setStepStatus('waiting', 'running', chunkLabel);
+        await analyzer.waitForFileActive(fileName);
+        _setStepStatus('waiting', 'done', chunkLabel);
+
+        _setState('transcribing');
+        _setStepStatus('transcribing', 'running', chunkLabel);
+        _chunkTranscripts[i] = await analyzer.transcribeAudio(fileUri, mimeType);
+        _setStepStatus('transcribing', 'done', chunkLabel);
+
+      } catch (err) {
+        _failedChunkIndex = i;
+        throw err;
+      } finally {
+        if (uploadedFileName) {
+          try { await analyzer.deleteFile(uploadedFileName); } catch (_) {}
+        }
+      }
+    }
+
+    const fullTranscript = _chunkTranscripts.filter(Boolean).join('\n\n');
+    _showTranscript(fullTranscript);
 
     _setState('analyzing');
     _setStepStatus('analyzing', 'running');
-    const result = await analyzer.analyzeStructure(transcript);
+    const result = await analyzer.analyzeStructure(fullTranscript);
     _setStepStatus('analyzing', 'done');
 
-    _currentResult    = result;
-    _currentTranscript = transcript;
+    _currentResult     = result;
+    _currentTranscript = fullTranscript;
     _setState('done');
     _renderResults(result);
 
   } catch (err) {
     _setState('error');
     _showError(err.message);
+    if (_failedChunkIndex >= 0) {
+      _showRetryButton(_failedChunkIndex);
+    }
   } finally {
     if (wakeLock) { try { await wakeLock.release(); } catch (_) {} }
-    if (uploadedFileName) {
-      try { await analyzer.deleteFile(uploadedFileName); } catch (_) {}
-    }
-    document.getElementById('analysis-start-btn').disabled = false;
+    _updateStartBtn();
   }
 }
 
@@ -361,14 +515,14 @@ function _setState(state) {
       el.classList.toggle('active', el.dataset.step === state);
     });
   } else if (state === 'done' || state === 'error') {
-    startBtn.disabled = false;
+    _updateStartBtn();
   } else if (state === 'idle') {
     progress.style.display = 'none';
-    startBtn.disabled = !_audioFile;
+    _updateStartBtn();
   }
 }
 
-function _setStepStatus(step, status) {
+function _setStepStatus(step, status, chunkLabel) {
   const row   = document.querySelector(`.analysis-step[data-step="${step}"]`);
   const label = row?.querySelector('.analysis-step-status');
   if (!row) return;
@@ -376,10 +530,10 @@ function _setStepStatus(step, status) {
   row.classList.remove('running', 'done');
   if (status === 'running') {
     row.classList.add('running');
-    if (label) label.textContent = '処理中…';
+    if (label) label.textContent = chunkLabel ? `処理中… ${chunkLabel}` : '処理中…';
   } else if (status === 'done') {
     row.classList.add('done');
-    if (label) label.textContent = '完了';
+    if (label) label.textContent = chunkLabel ? `完了 ${chunkLabel}` : '完了';
   }
 }
 
@@ -397,11 +551,29 @@ function _showTranscript(text) {
 function _showError(message) {
   const card = document.getElementById('analysis-error');
   document.getElementById('analysis-error-text').textContent = '❌ ' + message;
+  card.querySelector('.analysis-retry-btn')?.remove();
   card.style.display = 'block';
 }
 
 function _hideError() {
-  document.getElementById('analysis-error').style.display = 'none';
+  const card = document.getElementById('analysis-error');
+  card.querySelector('.analysis-retry-btn')?.remove();
+  card.style.display = 'none';
+}
+
+function _showRetryButton(chunkIndex) {
+  const card = document.getElementById('analysis-error');
+  const btn = document.createElement('button');
+  btn.className = 'action-btn-primary analysis-retry-btn';
+  btn.textContent = _chunks.length > 1
+    ? `チャンク ${chunkIndex + 1} から再試行`
+    : '最初から再試行';
+  btn.addEventListener('click', () => {
+    _failedChunkIndex = -1;
+    _hideError();
+    _processChunksFrom(chunkIndex);
+  });
+  card.appendChild(btn);
 }
 
 // ─── 解析結果描画 ────────────────────────────────
@@ -623,6 +795,7 @@ async function exportShareHtml(sessionData) {
     transcript:    sessionData.transcript || '',
     cards,
   });
+  const safeJson = jsonData.replace(/<\//g, '<\\/');
 
   const transcriptBlock = sessionData.transcript
     ? `<details class="card analysis-transcript-wrap">
@@ -677,7 +850,7 @@ body { padding: 16px; max-width: 640px; margin: 0 auto; }
   <div id="cards-area"></div>
 </div>
 <script>
-const SESSION = ${jsonData};
+const SESSION = ${safeJson};
 const PART_ORDER = ['リード','トップ','セカンド','サード','フォース','ベース','パーカス'];
 const CAT_ORDER  = ['ピッチ','リズム'];
 const sortParts = a => [...a].sort((x,y) => {
@@ -830,7 +1003,15 @@ function _saveSession(result, transcript, groupId, songId) {
     transcript:   '',
   };
   song.sessions.unshift(session);
-  saveSongs(data);
+  try {
+    saveSongs(data);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      showToast('容量不足のため保存できませんでした。古い履歴を削除してください。');
+      return null;
+    }
+    throw e;
+  }
   return sessionId;
 }
 
@@ -861,8 +1042,11 @@ function _clearAnalysisState() {
   _currentTranscript = '';
   _pendingGroupId    = null;
   _pendingSongId     = null;
+  _chunks            = [];
+  _chunkTranscripts  = [];
+  _failedChunkIndex  = -1;
   _state             = 'idle';
-  document.getElementById('analysis-start-btn').disabled = !_audioFile;
+  _updateStartBtn();
 }
 
 // ─── 誤変換報告（ボトムシート） ──────────────────

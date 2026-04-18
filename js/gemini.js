@@ -27,14 +27,48 @@ class GeminiAudioAnalyzer {
   // ─── モデルフォールバック付きfetch ────────────
 
   async _fetchForGenerate(options) {
+    // モデルフォールバックループ
     for (const modelName of this.modelNames) {
       const url = `${this.baseUrl}/models/${modelName}:generateContent`;
-      const response = await fetch(url, options);
+      let response;
+      try {
+        response = await fetch(url, options);
+      } catch (e) {
+        if (e instanceof TypeError) {
+          throw new Error('ネットワーク接続を確認してください。インターネットに接続されていない可能性があります。');
+        }
+        throw e;
+      }
       if (response.ok) return response;
+      if (response.status === 403) throw new Error('APIキーが無効です。設定画面から再登録してください。');
       if (response.status === 429 || response.status === 503) continue;
       throw new Error(`APIエラー [${response.status}]`);
     }
-    throw new Error('現在AIの利用上限に達しています。しばらく経ってから再度お試しください。');
+
+    // 全モデルが429/503 → gemini-2.5-flash固定で指数バックオフリトライ
+    const backoffDelays = [2000, 4000, 8000, 16000, 32000];
+    const fixedUrl = `${this.baseUrl}/models/gemini-2.5-flash:generateContent`;
+
+    for (const baseDelay of backoffDelays) {
+      const jitter = Math.random() * 1000;
+      await new Promise(resolve => setTimeout(resolve, baseDelay + jitter));
+
+      let response;
+      try {
+        response = await fetch(fixedUrl, options);
+      } catch (e) {
+        if (e instanceof TypeError) {
+          throw new Error('ネットワーク接続を確認してください。インターネットに接続されていない可能性があります。');
+        }
+        throw e;
+      }
+      if (response.ok) return response;
+      if (response.status !== 429 && response.status !== 503) {
+        throw new Error(`APIエラー [${response.status}]`);
+      }
+    }
+
+    throw new Error('1日のAPI利用上限に達した可能性があります。時間をおいてやり直すか、設定画面から別のAPIキーをお試しください。');
   }
 
   // ─── レスポンス安全抽出 ──────────────────────
