@@ -147,6 +147,7 @@ async function _saveAndTestApiKey() {
     if (res.ok) {
       statusEl.textContent = '🎉 設定完了！「ふりかえり」が使えるようになりました';
       statusEl.className   = 'settings-api-status success';
+      document.getElementById('analysis-demo-banner')?.remove();
     } else {
       statusEl.textContent = `キーが無効です（${res.status}）`;
       statusEl.className   = 'settings-api-status error';

@@ -14,6 +14,26 @@ const GAS_URL = atob([
   'd0blR6VGZkU2xKbGlTUDI5UWtYeTBwdy9leGVj',
 ].join(''));
 
+// ─── デモセッションデータ ─────────────────────────
+const DEMO_SESSION = {
+  session_name: 'サンプル：練習ふりかえり',
+  practice_date: '',
+  recorded_at: '2023年10月27日',
+  transcript: 'えっと。\nえっと、ベースの、え、ピッチがちょっと気になってて、経過音がちょっと雑になってる気がするので、うん、もう少し、え、1個1個の音の発声をもう少しクリアに硬く、えー、出してほしいです。で、えーと、リードに関しては、ちょっとコーラスに埋もれ気味な感覚があるから、もう少し硬い発声、硬くて前に、え、出るような発声をちょっと心がけてみてほしいです。で、え、サードはちょっとピッチが下がってる気がするので、もう少しあの、えー、トップやベース、え、セカンドと分けてもいいのかな。ま、うまくその、周りの調整をもう少し聞きながら、えー、歌うっていうのを心がけつつ、自分の、えっと、自分の骨伝導で聞こえる音というよりは、機材を通して外から聞こえる音をちゃんと耳で聞きに行くっていう意識を持ってほしいです。で、トップに関してはちょっとピッチが上ずってるのと、あと音の立ち上がりが遅くて、うん、と、少し、えっと、フレーズが潰れてるのと、ちょっと後ろに持たってる感覚があるから、もう少しこう、音の立ち上がりをジャストで、えーと、なるようにすると、え、和音ももっとクリアになると思うし、えっと、リズムもパキッと出てくるんじゃないかな。で、えーと、パーカスに関しては、この曲が、えー、割とこう、コーラス陣が遊びを入れるからこそ、もう少しこうどっしりと構えてほしいというか。え、構えてほしい感じがあって、というのが、今、少し、えーと、フィルインを入れるタイミングとかでテンポが前後にこうブレてる感覚があるので、もう少しこう、ジャストのタイミングでメトロノーム通りに、え、テンポを刻むっていうのをまずが意識してほしい。ってのは感じました。',
+  cards: [
+    { id: 'card-1', section: '全体', part: ['ベース'], category: 'ピッチ', importance: 'normal',
+      text: 'ピッチがちょっと気になってて、経過音がちょっと雑になってる気がするので、もう少し1個1個の音の発声をクリアに硬く出してほしいです。' },
+    { id: 'card-2', section: '全体', part: ['リード'], category: 'ダイナミクス', importance: 'normal',
+      text: 'コーラスに埋もれ気味な感覚があるから、もう少し硬く前に出るような発声を心がけてみてほしいです。' },
+    { id: 'card-3', section: '全体', part: ['サード'], category: 'ピッチ', importance: 'normal',
+      text: 'ピッチが下がっている。もう少しトップやベースとハモる意識をもって、周りを聴きながら歌うことを心がけて。自分の骨伝導で聞こえる音より、機材を通して外から聞こえる音を聴く意識を持つ。' },
+    { id: 'card-5', section: '全体', part: ['トップ'], category: 'リズム', importance: 'normal',
+      text: '音の立ち上がりが遅く、フレーズが潰れていて、後ろにモタっている。音の立ち上がりを早くし、ジャストで鳴るようにすると、和音がもっとクリアになる。リズムもパキッと出てくる。' },
+    { id: 'card-6', section: '全体', part: ['パーカス'], category: 'リズム', importance: 'normal',
+      text: 'コーラス陣が遊びを入れる曲だからこそ、もう少しどっしりと構えてほしい。フィルインを入れるタイミングなどでテンポが前後にブレるので、ジャストのタイミングでテンポキープすることをまず意識する。' },
+  ],
+};
+
 // ─── 内部状態 ────────────────────────────────────
 let _state            = 'idle'; // 'idle'|'uploading'|'waiting'|'transcribing'|'analyzing'|'done'|'error'
 let _currentResult    = null;   // 現在表示中の解析結果
@@ -152,15 +172,18 @@ function _updateConnectivityUI() {
     noKeyEl.style.display   = 'block';
     offlineEl.style.display = 'none';
     formEl.style.display    = 'none';
+    _showDemoSession();
   } else if (!navigator.onLine) {
     noKeyEl.style.display   = 'none';
     offlineEl.style.display = 'block';
     formEl.style.display    = 'block';
+    if (_currentResult === null) _clearAnalysisState();
     _updateStartBtn();
   } else {
     noKeyEl.style.display   = 'none';
     offlineEl.style.display = 'none';
     formEl.style.display    = 'block';
+    if (_currentResult === null) _clearAnalysisState();
     _updateStartBtn();
   }
 }
@@ -182,6 +205,46 @@ function _updateStartBtn() {
 
 function _checkApiKey() {
   _updateConnectivityUI();
+}
+
+function _showDemoSession() {
+  _renderResults(DEMO_SESSION);
+
+  const saveBtn = document.getElementById('analysis-save-btn');
+  if (saveBtn) saveBtn.style.display = 'none';
+
+  document.getElementById('analysis-no-key').style.display = 'none';
+
+  if (document.getElementById('analysis-demo-banner')) return;
+
+  const banner = document.createElement('div');
+  banner.id        = 'analysis-demo-banner';
+  banner.className = 'card analysis-notice analysis-notice--demo';
+  banner.innerHTML = `
+    <p class="analysis-notice-text">⚠️ これはサンプルデータです</p>
+    <p class="analysis-notice-sub">
+      APIキーを設定すると、自分たちの練習音源を解析できます。
+    </p>
+    <ol class="onboarding-steps">
+      <li><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> を開く</li>
+      <li>Googleアカウントにログイン</li>
+      <li>[APIキーを作成] &gt; [キーを作成] &gt; APIキーをコピー</li>
+      <li>設定画面に貼り付けて完了</li>
+    </ol>
+    <div class="onboarding-reassurance">
+      <span>💳 カード登録不要</span>
+      <span>🔒 この端末にのみ保存</span>
+      <span>¥ 無料</span>
+    </div>
+    <button class="action-btn-primary" id="demo-open-settings">
+      APIキーを設定する →
+    </button>`;
+
+  const results = document.getElementById('analysis-results');
+  results.insertBefore(banner, results.firstChild);
+
+  document.getElementById('demo-open-settings')
+    .addEventListener('click', openSettings);
 }
 
 function onApiKeySaved() {
@@ -1046,6 +1109,7 @@ function _clearAnalysisState() {
   _chunkTranscripts  = [];
   _failedChunkIndex  = -1;
   _state             = 'idle';
+  document.getElementById('analysis-demo-banner')?.remove();
   _updateStartBtn();
 }
 

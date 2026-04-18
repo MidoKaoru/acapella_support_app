@@ -1725,6 +1725,19 @@ input.bpm-slider::-moz-range-track {
   margin-bottom: 0;
 }
 
+/* デモバナー */
+.analysis-notice--demo {
+  border-left: 4px solid #EF9F27;
+  background: #FAEEDA;
+}
+.analysis-notice--demo .analysis-notice-text {
+  color: #854F0B;
+  font-weight: 700;
+}
+.analysis-notice--demo .analysis-notice-sub {
+  color: #854F0B;
+}
+
 /* ── APIキーオンボーディング ─────────────────── */
 .onboarding-title {
   font-size: 1rem;
