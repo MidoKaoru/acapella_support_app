@@ -213,6 +213,9 @@ function _showDemoSession() {
   const saveBtn = document.getElementById('analysis-save-btn');
   if (saveBtn) saveBtn.style.display = 'none';
 
+  const shareBtn = document.getElementById('analysis-share-btn');
+  if (shareBtn) shareBtn.style.display = 'none';
+
   document.getElementById('analysis-no-key').style.display = 'none';
 
   if (document.getElementById('analysis-demo-banner')) return;
@@ -1108,6 +1111,12 @@ function _clearAnalysisState() {
   _failedChunkIndex  = -1;
   _state             = 'idle';
   document.getElementById('analysis-demo-banner')?.remove();
+
+  const saveBtn = document.getElementById('analysis-save-btn');
+  if (saveBtn) saveBtn.style.display = 'flex';
+  const shareBtn = document.getElementById('analysis-share-btn');
+  if (shareBtn) shareBtn.style.display = '';
+
   _updateStartBtn();
 }
 
