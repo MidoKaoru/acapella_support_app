@@ -531,9 +531,10 @@ function _renderDetail(content, groupId, songId) {
     document.getElementById('detail-bpm-value').textContent = _tempBpm;
     if (_isMetroPlaying) {
       metronome.setBPM(_tempBpm);
-      document.getElementById('bpm-input').value        = String(_tempBpm);
-      document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(_tempBpm));
-      document.getElementById('bottom-bpm').textContent = String(_tempBpm);
+      document.getElementById('bpm-input').value  = String(_tempBpm);
+      document.getElementById('bpm-slider').value = Math.round(bpmToSlider(_tempBpm));
+      const bottomBpmEl = document.getElementById('bottom-bpm');
+      if (bottomBpmEl) bottomBpmEl.textContent = String(_tempBpm);
     }
   }
 
@@ -951,9 +952,10 @@ function _playMetro(song, bpm) {
   buildBeatDots(metronome.beatsPerMeasure);
   metronome.setSubdivisionSteps([]);
   const bpmVal = String(actualBpm);
-  document.getElementById('bpm-input').value        = bpmVal;
-  document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(actualBpm));
-  document.getElementById('bottom-bpm').textContent = bpmVal;
+  document.getElementById('bpm-input').value  = bpmVal;
+  document.getElementById('bpm-slider').value = Math.round(bpmToSlider(actualBpm));
+  const _bottomBpmEl = document.getElementById('bottom-bpm');
+  if (_bottomBpmEl) _bottomBpmEl.textContent = bpmVal;
   metronome.start();
   document.getElementById('metro-toggle-label').innerHTML = BTN_PAUSE;
   document.getElementById('metro-toggle').classList.add('playing');
@@ -1153,9 +1155,10 @@ function _bindEditEvents(groupId, songId) {
       buildBeatDots(metronome.beatsPerMeasure);
       metronome.setSubdivisionSteps([]);
       const bpmVal = String(_editDraft.bpm);
-      document.getElementById('bpm-input').value        = bpmVal;
-      document.getElementById('bpm-slider').value       = Math.round(bpmToSlider(_editDraft.bpm));
-      document.getElementById('bottom-bpm').textContent = bpmVal;
+      document.getElementById('bpm-input').value  = bpmVal;
+      document.getElementById('bpm-slider').value = Math.round(bpmToSlider(_editDraft.bpm));
+      const _bpmEl = document.getElementById('bottom-bpm');
+      if (_bpmEl) _bpmEl.textContent = bpmVal;
       metronome.start();
       document.getElementById('metro-toggle-label').innerHTML = BTN_PAUSE;
       document.getElementById('metro-toggle').classList.add('playing');

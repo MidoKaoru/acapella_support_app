@@ -43,6 +43,16 @@ let buildBeatDots = () => {};
 // ─── タブ管理 ────────────────────────────────
 let _animatingPanel = null;
 
+function updateControllerVisibility(tabId) {
+  const controller = document.querySelector('.common-controller');
+  const tabContent = document.querySelector('.tab-content');
+  const isMain = tabId === 'main';
+  controller.classList.toggle('hidden', !isMain);
+  tabContent.classList.toggle('no-controller', !isMain);
+  const toast = document.getElementById('toast');
+  if (toast) toast.classList.toggle('no-controller', !isMain);
+}
+
 function switchToTab(targetBtn, direction) {
   const tabBtns   = document.querySelectorAll('.tab-btn');
   const tabPanels = document.querySelectorAll('.tab-panel');
@@ -66,6 +76,11 @@ function switchToTab(targetBtn, direction) {
   // 現在のパネルを非表示
   tabPanels.forEach(p => p.classList.remove('active'));
 
+  // メイン以外のタブへ遷移する場合は音を止める
+  if (targetBtn.dataset.tab !== 'main') {
+    stopAllSounds();
+  }
+
   // 新しいパネルをスライドイン
   const nextPanel = document.getElementById(`tab-${targetBtn.dataset.tab}`);
   const animClass = direction === 'left' ? 'slide-in-left' : 'slide-in-right';
@@ -76,6 +91,8 @@ function switchToTab(targetBtn, direction) {
     nextPanel.classList.add('active');
     if (_animatingPanel === nextPanel) _animatingPanel = null;
   }, { once: true });
+
+  updateControllerVisibility(targetBtn.dataset.tab);
 }
 
 function initTabs() {
@@ -178,9 +195,9 @@ function initMetronome() {
   function applyBPM(value) {
     const bpm = Math.max(40, Math.min(240, Math.round(Number(value))));
     metronome.setBPM(bpm);
-    bpmInput.value        = bpm;
-    bpmSlider.value       = bpmToSlider(bpm);
-    bottomBpm.textContent = bpm;
+    bpmInput.value  = bpm;
+    bpmSlider.value = bpmToSlider(bpm);
+    if (bottomBpm) bottomBpm.textContent = bpm;
   }
 
   // 拍ドット を再描画（グローバル変数に代入してlibrary.jsからも呼べるようにする）
@@ -488,25 +505,50 @@ function initSaveState() {
   });
 }
 
-// ─── 全停止ボタン ────────────────────────────
-function initGlobalStop() {
-  document.getElementById('global-stop').addEventListener('click', () => {
-    // メトロノーム停止
-    if (metronome.isPlaying) {
-      metronome.stop();
-      document.getElementById('metro-toggle-label').innerHTML = BTN_PLAY;
-      document.getElementById('metro-toggle').classList.remove('playing');
-    }
+// ─── 全音停止（サブ画面を開く前などに呼ぶ） ──────────
+function stopAllSounds() {
+  if (metronome.isPlaying) {
+    metronome.stop();
+    const label = document.getElementById('metro-toggle-label');
+    if (label) label.innerHTML = BTN_PLAY;
+    const toggle = document.getElementById('metro-toggle');
+    if (toggle) toggle.classList.remove('playing');
+  }
+  pitchPipe.stopAll();
+  document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
+}
 
-    // ピッチパイプ全音停止
-    pitchPipe.stopAll();
-    document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
-  });
+// ─── リズムサブ画面 ──────────────────────────
+function openRhythm() {
+  const screen = document.getElementById('screen-rhythm');
+  screen.classList.add('open');
+  screen.setAttribute('aria-hidden', 'false');
+}
+
+function closeRhythm() {
+  const screen = document.getElementById('screen-rhythm');
+  screen.classList.remove('open');
+  screen.setAttribute('aria-hidden', 'true');
+}
+
+function initRhythmSwipe() {
+  const screen = document.getElementById('screen-rhythm');
+  let sx = 0, sy = 0;
+  screen.addEventListener('touchstart', e => {
+    if (e.target.closest('input[type="range"]')) return;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+  }, { passive: true });
+  screen.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    if (dx > 50 && Math.abs(dx) > Math.abs(dy)) closeRhythm();
+  }, { passive: true });
 }
 
 // ─── タブ スワイプ操作 ───────────────────────
 function initSwipe() {
-  const TABS   = ['analysis', 'main', 'rhythm'];
+  const TABS   = ['main', 'analysis'];
   const content = document.querySelector('.tab-content');
   let startX = 0, startY = 0, tracking = false;
 
@@ -575,10 +617,12 @@ function initHamburgerMenu() {
   // 各メニュー項目
   document.getElementById('menu-library').addEventListener('click', () => {
     closeMenu();
+    stopAllSounds();
     openLibrary();
   });
   document.getElementById('menu-settings').addEventListener('click', () => {
     closeMenu();
+    stopAllSounds();
     openSettings();
   });
 }
@@ -604,11 +648,18 @@ document.addEventListener('DOMContentLoaded', () => {
   initPitchPipe();
   initMetronome();
   initRhythm();
-  initGlobalStop();
   initSaveState();
   initHamburgerMenu();
   initLibrary();
   initSettings();
   initAnalysis();
   registerSW();
+
+  // コントローラー初期状態（メインタブがデフォルト）
+  updateControllerVisibility('main');
+
+  // リズムサブ画面
+  document.getElementById('rhythm-back-btn').addEventListener('click', closeRhythm);
+  document.getElementById('open-rhythm-btn').addEventListener('click', openRhythm);
+  initRhythmSwipe();
 });

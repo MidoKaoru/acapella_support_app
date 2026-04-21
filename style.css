@@ -716,6 +716,18 @@ input.bpm-slider::-moz-range-track {
 }
 
 /* ===== 共通コントローラー ===== */
+.common-controller.hidden {
+  display: none;
+}
+
+.tab-content.no-controller {
+  bottom: var(--safe-bottom);
+}
+
+#toast.no-controller {
+  bottom: calc(var(--safe-bottom) + 12px);
+}
+
 .common-controller {
   position: fixed;
   bottom: 0;

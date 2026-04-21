@@ -2,7 +2,7 @@
   "name": "local-server",
   "scripts": {
     "start": "npx http-server -c-1",
-    "repro": "npx repomix",
+    "repro": "npx repomix --output ../repomix-output.xml",
     "merge-dict": "node merge-dict.js"
   }
 }
