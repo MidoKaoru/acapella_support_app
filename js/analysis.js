@@ -240,15 +240,34 @@ function initAnalysis() {
   document.getElementById('record-save-btn').addEventListener('click', async () => {
     const blob = await window.recorder.stop();
     if (!blob || blob.size === 0) { showToast('録音データがありません'); return; }
-    const now = new Date();
-    const ts  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-    const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href     = url;
-    a.download = `recording_${ts}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const now      = new Date();
+    const ts       = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const ext      = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const fileName = `recording_${ts}.${ext}`;
+    let shared = false;
+    if (navigator.share) {
+      const file = new File([blob], fileName, { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          shared = true;
+        } catch (e) {
+          if (e.name === 'AbortError') {
+            _updateRecordingUI();
+            _updateRecordingState();
+            return;
+          }
+        }
+      }
+    }
+    if (!shared) {
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href     = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
     _updateRecordingUI();
     _updateRecordingState();
   });

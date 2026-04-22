@@ -2466,6 +2466,15 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
   border-color: var(--danger);
 }
 
+/* マイク許可ヒント */
+.record-mic-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.6;
+  padding: 2px 0;
+}
+
 /* 共通コントローラーのマイクボタン */
 .ctrl-mic-btn {
   display: flex;
