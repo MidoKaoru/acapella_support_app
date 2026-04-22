@@ -690,30 +690,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const ctrlMicBtn = document.getElementById('ctrl-mic-btn');
 
-  async function _onMicDown(e) {
-    e.preventDefault();
+  ctrlMicBtn.addEventListener('click', async () => {
     try {
       if (window.recorder.state === 'idle') {
         await window.recorder.start();
       } else if (window.recorder.state === 'paused') {
         window.recorder.resume();
+      } else if (window.recorder.state === 'recording') {
+        window.recorder.pause();
       }
     } catch (_err) {
       showToast('マイクにアクセスできませんでした');
       return;
     }
     _updateRecordingState();
-  }
-
-  function _onMicUp(e) {
-    e.preventDefault();
-    window.recorder.pause();
-    _updateRecordingState();
-  }
-
-  ctrlMicBtn.addEventListener('touchstart', _onMicDown, { passive: false });
-  ctrlMicBtn.addEventListener('mousedown',  _onMicDown);
-  ctrlMicBtn.addEventListener('touchend',   _onMicUp,   { passive: false });
-  ctrlMicBtn.addEventListener('mouseup',    _onMicUp);
+  });
   ctrlMicBtn.addEventListener('contextmenu', e => e.preventDefault());
 });

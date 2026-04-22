@@ -63,7 +63,7 @@ let _chunks           = [];    // ファイルスライスチャンク配列
 let _chunkTranscripts = [];    // チャンクごとの文字起こし
 let _failedChunkIndex = -1;    // エラーが発生したチャンクのインデックス
 let wakeLock          = null;  // スリープ抑止ロック
-let _inputMode         = 'file'; // 'file' | 'record'
+let _inputMode         = 'record'; // 'file' | 'record'
 
 // ─── チップ・カードのソート順定義 ──────────────
 
@@ -200,13 +200,14 @@ function initAnalysis() {
   // ─── 録音ボタン（要件4） ──────────────────────────
   const recordBtn = document.getElementById('record-btn');
 
-  async function _onRecordDown(e) {
-    e.preventDefault();
+  recordBtn.addEventListener('click', async () => {
     try {
       if (window.recorder.state === 'idle') {
         await window.recorder.start();
       } else if (window.recorder.state === 'paused') {
         window.recorder.resume();
+      } else if (window.recorder.state === 'recording') {
+        window.recorder.pause();
       }
     } catch (_err) {
       showToast('マイクにアクセスできませんでした');
@@ -214,19 +215,7 @@ function initAnalysis() {
     }
     _updateRecordingUI();
     _updateRecordingState();
-  }
-
-  function _onRecordUp(e) {
-    e.preventDefault();
-    window.recorder.pause();
-    _updateRecordingUI();
-    _updateRecordingState();
-  }
-
-  recordBtn.addEventListener('touchstart', _onRecordDown, { passive: false });
-  recordBtn.addEventListener('mousedown',  _onRecordDown);
-  recordBtn.addEventListener('touchend',   _onRecordUp,   { passive: false });
-  recordBtn.addEventListener('mouseup',    _onRecordUp);
+  });
   recordBtn.addEventListener('contextmenu', e => e.preventDefault());
 
   // ─── クリアボタン（要件4） ──────────────────────
@@ -910,8 +899,31 @@ function _renderCards(cards) {
   const container = document.getElementById('analysis-cards');
   container.innerHTML = '';
 
+  if (_currentResult) {
+    const addBtn = document.createElement('button');
+    addBtn.className   = 'action-btn-secondary add-card-btn';
+    addBtn.textContent = '＋ カードを追加';
+    addBtn.addEventListener('click', () => {
+      _openCardEditSheet({
+        card: null,
+        existingCards: _currentResult.cards || [],
+        onSave: (savedCard, isNew) => {
+          if (isNew) {
+            savedCard.id = 'c' + Date.now();
+            _currentResult.cards.unshift(savedCard);
+          }
+          _refreshAnalysisView();
+        },
+      });
+    });
+    container.appendChild(addBtn);
+  }
+
   if (cards.length === 0) {
-    container.innerHTML = '<p class="analysis-empty">条件に合うカードがありません</p>';
+    const emptyEl = document.createElement('p');
+    emptyEl.className   = 'analysis-empty';
+    emptyEl.textContent = '条件に合うカードがありません';
+    container.appendChild(emptyEl);
     return;
   }
 
@@ -923,8 +935,16 @@ function _renderCards(cards) {
     header.className = 'analysis-card-header';
 
     const meta = document.createElement('div');
-    meta.className   = 'analysis-card-meta';
+    meta.className   = 'analysis-card-meta editable-tag';
     meta.textContent = `${card.section} ｜ ${card.part.join(' / ')} ｜ ${card.category}`;
+    meta.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _openCardEditSheet({
+        card,
+        existingCards: _currentResult?.cards || [],
+        onSave: () => _refreshAnalysisView(),
+      });
+    });
 
     const starBtn = document.createElement('button');
     starBtn.className = 'card-fav-btn' + (card.isFavorite ? ' active' : '');
@@ -1366,6 +1386,204 @@ async function _reportToGas(wrong, correct, context) {
       body:   JSON.stringify({ wrong, correct, context }),
     });
   } catch (_) {}
+}
+
+// ─── 解析結果ビュー再描画ヘルパー ───────────────────
+
+function _refreshAnalysisView() {
+  if (!_currentResult) return;
+  const allCards = _currentResult.cards || [];
+  const parts = _sortParts([...new Set(allCards.flatMap(c => c.part || []))]);
+  const cats  = _sortCats([...new Set(allCards.map(c => c.category).filter(Boolean))]);
+  const secs  = _sortSecs([...new Set(allCards.map(c => c.section).filter(Boolean))]);
+  _buildChips('analysis-part-chips', parts, 'parts');
+  _buildChips('analysis-cat-chips',  cats,  'categories');
+  _buildChips('analysis-sec-chips',  secs,  'sections');
+  _applyFilter();
+}
+
+// ─── カード編集ボトムシート ─────────────────────────
+
+function _openCardEditSheet(opts) {
+  document.getElementById('card-edit-sheet')?.remove();
+  document.getElementById('card-edit-overlay')?.remove();
+
+  const { card: existingCard, existingCards = [], onSave } = opts;
+  const isNew = !existingCard;
+  const card  = existingCard || { section: '', part: [], category: '', importance: 'normal', text: '' };
+
+  const existingSections = _sortSecs([...new Set(existingCards.map(c => c.section).filter(Boolean))]);
+  const existingParts    = _sortParts([...new Set(existingCards.flatMap(c => c.part || []))]);
+  const existingCats     = _sortCats([...new Set(existingCards.map(c => c.category).filter(Boolean))]);
+
+  const DEFAULT_SECS  = ['全体', 'Aメロ', 'Bメロ', 'サビ', 'その他'];
+  const DEFAULT_PARTS = ['リード', 'トップ', 'セカンド', 'サード', 'フォース', 'ベース', 'パーカス'];
+  const DEFAULT_CATS  = ['ピッチ', 'リズム', 'ダイナミクス', '歌詞・発音', 'その他'];
+
+  const allSecs  = _sortSecs([...new Set([...DEFAULT_SECS, ...existingSections])]);
+  const allParts = _sortParts([...new Set([...DEFAULT_PARTS, ...existingParts])]);
+  const allCats  = _sortCats([...new Set([...DEFAULT_CATS, ...existingCats])]);
+
+  let selSection = card.section || '';
+  let selParts   = [...(card.part || [])];
+  let selCat     = card.category || '';
+  let selImp     = card.importance || 'normal';
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'card-edit-overlay';
+  overlay.className = 'menu-overlay open';
+  overlay.setAttribute('aria-hidden', 'true');
+
+  const sheet = document.createElement('div');
+  sheet.id        = 'card-edit-sheet';
+  sheet.className = 'menu-sheet open card-edit-sheet';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-label', isNew ? 'カードを追加' : 'カードを編集');
+
+  sheet.innerHTML = `
+    <div class="menu-sheet-handle"></div>
+    <div class="card-edit-sheet-body">
+      <div class="report-sheet-content">
+        <h3 class="report-sheet-title">${isNew ? 'カードを追加' : 'カードを編集'}</h3>
+
+        <div class="control-group card-edit-field">
+          <span class="control-label">重要度</span>
+          <div class="segment-control" id="cef-importance" role="group" aria-label="重要度">
+            <button class="segment-btn${selImp !== 'high' ? ' active' : ''}" data-val="normal">通常</button>
+            <button class="segment-btn${selImp === 'high' ? ' active' : ''}" data-val="high">高い</button>
+          </div>
+        </div>
+
+        <div class="control-group card-edit-field">
+          <span class="control-label">セクション</span>
+          <div class="card-edit-chips" id="cef-sec-chips">
+            ${allSecs.map(s => `<button class="card-edit-chip${s === selSection ? ' active' : ''}" data-val="${_esc(s)}">${_esc(s)}</button>`).join('')}
+          </div>
+          <input type="text" class="edit-text-input card-edit-tag-input" id="cef-sec-input"
+            placeholder="新規セクション...">
+        </div>
+
+        <div class="control-group card-edit-field">
+          <span class="control-label">パート（複数選択可）</span>
+          <div class="card-edit-chips" id="cef-part-chips">
+            ${allParts.map(p => `<button class="card-edit-chip${selParts.includes(p) ? ' active' : ''}" data-val="${_esc(p)}">${_esc(p)}</button>`).join('')}
+          </div>
+          <input type="text" class="edit-text-input card-edit-tag-input" id="cef-part-input"
+            placeholder="新規パート名を入力してEnter">
+        </div>
+
+        <div class="control-group card-edit-field">
+          <span class="control-label">カテゴリ</span>
+          <div class="card-edit-chips" id="cef-cat-chips">
+            ${allCats.map(c => `<button class="card-edit-chip${c === selCat ? ' active' : ''}" data-val="${_esc(c)}">${_esc(c)}</button>`).join('')}
+          </div>
+          <input type="text" class="edit-text-input card-edit-tag-input" id="cef-cat-input"
+            placeholder="新規カテゴリ...">
+        </div>
+
+        <div class="control-group card-edit-field">
+          <span class="control-label">内容</span>
+          <textarea class="analysis-card-text-inline" id="cef-text" rows="4"
+            placeholder="フィードバック内容を入力...">${_esc(card.text || '')}</textarea>
+        </div>
+
+        <button class="action-btn-primary" id="cef-save">${isNew ? '追加' : '保存'}</button>
+        <button class="action-btn-ghost" id="cef-cancel">キャンセル</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(sheet);
+
+  // 重要度トグル
+  sheet.querySelectorAll('#cef-importance .segment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sheet.querySelectorAll('#cef-importance .segment-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selImp = btn.dataset.val;
+    });
+  });
+
+  // セクション（単一選択）
+  sheet.querySelectorAll('#cef-sec-chips .card-edit-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      sheet.querySelectorAll('#cef-sec-chips .card-edit-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      selSection = chip.dataset.val;
+    });
+  });
+
+  // パート（複数選択）
+  sheet.querySelectorAll('#cef-part-chips .card-edit-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+      const val = chip.dataset.val;
+      const idx = selParts.indexOf(val);
+      if (idx === -1) selParts.push(val); else selParts.splice(idx, 1);
+    });
+  });
+
+  // パート新規入力（Enterで追加）
+  const partInput = sheet.querySelector('#cef-part-input');
+  const _addNewPartChip = () => {
+    const val = partInput.value.trim();
+    if (!val) return;
+    partInput.value = '';
+    if (!selParts.includes(val)) selParts.push(val);
+    const existing = sheet.querySelector(`#cef-part-chips .card-edit-chip[data-val="${val}"]`);
+    if (existing) {
+      existing.classList.add('active');
+    } else {
+      const newChip = document.createElement('button');
+      newChip.className   = 'card-edit-chip active';
+      newChip.dataset.val = val;
+      newChip.textContent = val;
+      newChip.type        = 'button';
+      newChip.addEventListener('click', () => {
+        newChip.classList.toggle('active');
+        const i = selParts.indexOf(val);
+        if (i === -1) selParts.push(val); else selParts.splice(i, 1);
+      });
+      sheet.querySelector('#cef-part-chips').appendChild(newChip);
+    }
+  };
+  partInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); _addNewPartChip(); } });
+
+  // カテゴリ（単一選択）
+  sheet.querySelectorAll('#cef-cat-chips .card-edit-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      sheet.querySelectorAll('#cef-cat-chips .card-edit-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      selCat = chip.dataset.val;
+    });
+  });
+
+  const close = () => { sheet.remove(); overlay.remove(); };
+  overlay.addEventListener('click', close);
+  sheet.querySelector('#cef-cancel').addEventListener('click', close);
+
+  sheet.querySelector('#cef-save').addEventListener('click', () => {
+    _addNewPartChip();
+    const secInput  = sheet.querySelector('#cef-sec-input').value.trim();
+    const catInput  = sheet.querySelector('#cef-cat-input').value.trim();
+    const finalSec  = secInput  || selSection;
+    const finalCat  = catInput  || selCat;
+    const finalText = sheet.querySelector('#cef-text').value;
+
+    if (!finalSec)              { showToast('セクションを選択または入力してください'); return; }
+    if (selParts.length === 0)  { showToast('パートを選択または入力してください');     return; }
+    if (!finalCat)              { showToast('カテゴリを選択または入力してください');   return; }
+
+    card.section    = finalSec;
+    card.part       = [...selParts];
+    card.category   = finalCat;
+    card.importance = selImp;
+    card.text       = finalText;
+
+    close();
+    onSave(card, isNew);
+  });
 }
 
 // ─── ユーティリティ ──────────────────────────────

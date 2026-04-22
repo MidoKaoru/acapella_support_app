@@ -2516,6 +2516,89 @@ body.is-recording::before {
   animation: recordingBorderPulse 1.2s ease-in-out infinite;
 }
 
+/* ===== カード追加・編集ボトムシート ===== */
+
+/* ＋ カードを追加ボタン */
+.add-card-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 15px;
+  min-height: 44px;
+  padding: 10px 16px;
+  margin-bottom: 2px;
+}
+
+/* カード編集ボトムシート本体 */
+.card-edit-sheet {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.card-edit-sheet-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
+
+.card-edit-sheet .report-sheet-content {
+  gap: 14px;
+}
+
+/* タグ選択チップ行 */
+.card-edit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 個別タグチップ */
+.card-edit-chip {
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  min-height: 36px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.card-edit-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.card-edit-chip:active { opacity: 0.75; }
+
+/* 新規タグ入力欄 */
+.card-edit-tag-input {
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+/* フォームフィールド間隔 */
+.card-edit-field {
+  gap: 8px;
+}
+
+/* タグ部分のクリック可能スタイル */
+.analysis-card-meta.editable-tag {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.analysis-card-meta.editable-tag:hover {
+  color: var(--primary-dark);
+}
+
 /* ===== デスクトップ補完 ===== */
 @media (min-width: 600px) {
   .note-grid {

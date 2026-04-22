@@ -678,6 +678,7 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
       </div>
       ${transcriptHtml}
       ${filterHtml}
+      <button class="action-btn-secondary add-card-btn" id="lib-add-card-btn">＋ カードを追加</button>
       <div class="session-detail-cards" id="lib-session-cards"></div>
     </div>`;
 
@@ -688,6 +689,28 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
     } else {
       exportShareHtml(session);
     }
+  });
+
+  // カード追加ボタン
+  content.querySelector('#lib-add-card-btn').addEventListener('click', () => {
+    _openCardEditSheet({
+      card: null,
+      existingCards: cards,
+      onSave: (savedCard, isNew) => {
+        if (!isNew) return;
+        savedCard.id = 'c' + Date.now();
+        const _d = getSongs();
+        const _g = _d.groups.find(g => g.id === groupId);
+        const _sng = _g?.songs.find(s => s.id === songId);
+        const _sess = _sng?.sessions?.find(s => s.id === sessionId);
+        if (_sess) {
+          if (!Array.isArray(_sess.cards)) _sess.cards = [];
+          _sess.cards.unshift(savedCard);
+          saveSongs(_d);
+        }
+        _render(false);
+      },
+    });
   });
 
   // セッション名のインライン編集
@@ -748,8 +771,29 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
       headerDiv.className = 'analysis-card-header';
 
       const metaDiv = document.createElement('div');
-      metaDiv.className   = 'analysis-card-meta';
+      metaDiv.className   = 'analysis-card-meta editable-tag';
       metaDiv.textContent = metaText;
+      metaDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _openCardEditSheet({
+          card,
+          existingCards: cards,
+          onSave: () => {
+            const _d = getSongs();
+            const _g = _d.groups.find(g => g.id === groupId);
+            const _sng = _g?.songs.find(s => s.id === songId);
+            const _sess = _sng?.sessions?.find(s => s.id === sessionId);
+            if (_sess?.cards) {
+              const _idx = cards.indexOf(card);
+              if (_idx !== -1) {
+                _sess.cards[_idx] = { ..._sess.cards[_idx], ...card };
+                saveSongs(_d);
+              }
+            }
+            _render(false);
+          },
+        });
+      });
 
       const starBtn = document.createElement('button');
       starBtn.className = 'card-fav-btn' + (card.isFavorite ? ' active' : '');
