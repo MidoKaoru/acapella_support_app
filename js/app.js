@@ -614,12 +614,19 @@ function initHamburgerMenu() {
   btn.addEventListener('click', openMenu);
   overlay.addEventListener('click', closeMenu);
 
+  // 下スワイプでクローズ
+  let _swipeSX = 0, _swipeSY = 0;
+  sheet.addEventListener('touchstart', e => {
+    _swipeSX = e.touches[0].clientX;
+    _swipeSY = e.touches[0].clientY;
+  }, { passive: true });
+  sheet.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _swipeSX;
+    const dy = e.changedTouches[0].clientY - _swipeSY;
+    if (dy > 50 && dy > Math.abs(dx)) closeMenu();
+  }, { passive: true });
+
   // 各メニュー項目
-  document.getElementById('menu-library').addEventListener('click', () => {
-    closeMenu();
-    stopAllSounds();
-    openLibrary();
-  });
   document.getElementById('menu-settings').addEventListener('click', () => {
     closeMenu();
     stopAllSounds();
@@ -657,6 +664,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // コントローラー初期状態（メインタブがデフォルト）
   updateControllerVisibility('main');
+
+  // コントローラー内ライブラリボタン
+  document.getElementById('ctrl-library-btn').addEventListener('click', () => {
+    stopAllSounds();
+    openLibrary();
+  });
 
   // リズムサブ画面
   document.getElementById('rhythm-back-btn').addEventListener('click', closeRhythm);

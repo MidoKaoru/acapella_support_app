@@ -34,6 +34,22 @@ const DEMO_SESSION = {
   ],
 };
 
+// ─── 並列実行制御 ────────────────────────────────
+
+const CONCURRENCY_LIMIT = 3;
+
+async function parallelLimit(tasks, limit) {
+  const results = [];
+  const executing = new Set();
+  for (const task of tasks) {
+    const p = task().then(r => { executing.delete(p); return r; });
+    executing.add(p);
+    results.push(p);
+    if (executing.size >= limit) await Promise.race(executing);
+  }
+  return Promise.all(results);
+}
+
 // ─── 内部状態 ────────────────────────────────────
 let _state            = 'idle'; // 'idle'|'uploading'|'waiting'|'transcribing'|'analyzing'|'done'|'error'
 let _currentResult    = null;   // 現在表示中の解析結果
@@ -507,8 +523,20 @@ async function _acquireWakeLock() {
   } catch (_) {}
 }
 
+function _deduplicateTranscript(text, cutoffMinutes) {
+  if (cutoffMinutes === 0) return text;
+  const lines = text.split('\n');
+  const result = [];
+  let keep = false;
+  for (const line of lines) {
+    const m = line.match(/^\[(\d+):(\d{2})\]/);
+    if (m) keep = parseInt(m[1]) >= cutoffMinutes;
+    if (keep) result.push(line);
+  }
+  return result.join('\n');
+}
+
 async function _processChunksFrom(startIndex) {
-  const total = _chunks.length;
   let analyzer;
   try {
     analyzer = new GeminiAudioAnalyzer();
@@ -518,43 +546,52 @@ async function _processChunksFrom(startIndex) {
     return;
   }
 
+  let uploadedFileName = null;
+
   try {
     await _acquireWakeLock();
     showToast('処理中は画面をスリープさせないでください');
 
-    for (let i = startIndex; i < total; i++) {
-      const chunkLabel = total > 1 ? `(${i + 1}/${total})` : null;
-      let uploadedFileName = null;
+    _setState('uploading');
+    _setStepStatus('uploading', 'running');
+    const { fileUri, mimeType, fileName } = await analyzer.uploadAudioFile(_audioFile);
+    uploadedFileName = fileName;
+    _setStepStatus('uploading', 'done');
 
-      try {
-        _setState('uploading');
-        _setStepStatus('uploading', 'running', chunkLabel);
-        const chunkFile = _audioFile;
-        const { fileUri, mimeType, fileName } = await analyzer.uploadAudioFile(chunkFile);
-        uploadedFileName = fileName;
-        _setStepStatus('uploading', 'done', chunkLabel);
+    _setState('waiting');
+    _setStepStatus('waiting', 'running');
+    await analyzer.waitForFileActive(fileName);
+    _setStepStatus('waiting', 'done');
 
-        _setState('waiting');
-        _setStepStatus('waiting', 'running', chunkLabel);
-        await analyzer.waitForFileActive(fileName);
-        _setStepStatus('waiting', 'done', chunkLabel);
+    _setState('transcribing');
+    _setStepStatus('transcribing', 'running');
 
-        _setState('transcribing');
-        _setStepStatus('transcribing', 'running', chunkLabel);
-        _chunkTranscripts[i] = await analyzer.transcribeAudio(fileUri, mimeType);
-        _setStepStatus('transcribing', 'done', chunkLabel);
-
-      } catch (err) {
-        _failedChunkIndex = i;
-        throw err;
-      } finally {
-        if (uploadedFileName) {
-          try { await analyzer.deleteFile(uploadedFileName); } catch (_) {}
-        }
-      }
+    // 30分ステップ・5分オーバーラップ・35分区間で最大3時間をカバー
+    const segments = [];
+    for (let start = 0; start < 180; start += 30) {
+      segments.push({ startMin: start, endMin: start + 35 });
     }
 
-    const fullTranscript = _chunkTranscripts.filter(Boolean).join('\n\n');
+    let completedCount = 0;
+    const totalSegments = segments.length;
+
+    const tasks = segments.map(({ startMin, endMin }) => () =>
+      analyzer.transcribeAudio(fileUri, mimeType, startMin, endMin).then(text => {
+        completedCount++;
+        _setStepStatus('transcribing', 'running', `(${completedCount}/${totalSegments})`);
+        return { startMin, text };
+      })
+    );
+
+    const segmentResults = await parallelLimit(tasks, CONCURRENCY_LIMIT);
+
+    const fullTranscript = segmentResults
+      .map(({ startMin, text }) => _deduplicateTranscript(text, startMin))
+      .map(t => t.trim())
+      .filter(Boolean)
+      .join('\n');
+
+    _setStepStatus('transcribing', 'done');
     _showTranscript(fullTranscript);
 
     _setState('analyzing');
@@ -570,10 +607,10 @@ async function _processChunksFrom(startIndex) {
   } catch (err) {
     _setState('error');
     _showError(err.message);
-    if (_failedChunkIndex >= 0) {
-      _showRetryButton(_failedChunkIndex);
-    }
   } finally {
+    if (uploadedFileName) {
+      try { await analyzer.deleteFile(uploadedFileName); } catch (_) {}
+    }
     if (wakeLock) { try { await wakeLock.release(); } catch (_) {} }
     _updateStartBtn();
   }

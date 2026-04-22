@@ -154,11 +154,11 @@ class GeminiAudioAnalyzer {
 
   // ─── ② 文字起こし ───────────────────────────
 
-  async transcribeAudio(fileUri, mimeType) {
+  async transcribeAudio(fileUri, mimeType, startMin, endMin) {
     const payload = {
       contents: [{
         parts: [
-          { text: 'この音声ファイルの「話し声（会話）」の部分のみを正確に文字起こししてください。歌唱（コーラス、リードボーカル、ボイパなど）の部分は絶対に文字起こしに含めず、完全に無視してください。' },
+          { text: `この音声ファイルの${startMin}:00〜${endMin}:00の範囲内にある話し声だけを文字起こしして。歌唱（コーラス、リードボーカル、ボイパなど）の部分は絶対に文字起こしに含めず、完全に無視してください。各発言の冒頭に発言開始時刻を [MM:SS] の形式で付けて出力してください。` },
           { file_data: { file_uri: fileUri, mime_type: mimeType } },
         ],
       }],
@@ -181,7 +181,6 @@ class GeminiAudioAnalyzer {
 
     return normalizeMusicTerms(
       truncateRepetition(rawText)
-        .replace(/^\d{2}:\d{2}\s*/gm, '')
         .replace(/\n{2,}/g, '\n')
         .trim()
     );
