@@ -103,6 +103,37 @@
           <p class="analysis-notice-sub">接続を確認してください。</p>
         </div>
 
+        <!-- 入力方式セグメント -->
+        <div class="card control-group" id="analysis-mode-card">
+          <div class="segment-control" id="analysis-input-mode" role="group" aria-label="入力方式">
+            <button class="segment-btn active" data-mode="file">ファイル選択</button>
+            <button class="segment-btn" data-mode="record">録音</button>
+          </div>
+        </div>
+
+        <!-- 録音パネル -->
+        <div id="analysis-record-panel" class="card control-group" style="display:none">
+          <div class="record-btn-wrap">
+            <button class="record-btn" id="record-btn" aria-label="録音開始 / 停止">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="2" width="6" height="12" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="12" y1="17" x2="12" y2="22"/>
+                <line x1="9" y1="22" x2="15" y2="22"/>
+              </svg>
+              <span class="record-btn-label" id="record-btn-label">録音</span>
+            </button>
+          </div>
+          <button class="record-clear-btn" id="record-clear-btn" aria-label="録音データをクリア">
+            ✖ クリア
+          </button>
+          <button class="action-btn-primary" id="record-analyze-btn" style="display:none">解析をスタート</button>
+          <button class="action-btn-secondary" id="record-save-btn" style="display:none">
+            💾 ファイルを保存
+          </button>
+        </div>
+
         <!-- 解析フォーム -->
         <div id="analysis-form" class="card control-group">
           <span class="control-label">音声ファイル</span>
@@ -342,6 +373,17 @@
       <span>ライブラリ</span>
     </button>
 
+    <!-- マイク（録音） -->
+    <button class="ctrl-mic-btn" id="ctrl-mic-btn" aria-label="録音">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="2" width="6" height="12" rx="3"/>
+        <path d="M5 10a7 7 0 0 0 14 0"/>
+        <line x1="12" y1="17" x2="12" y2="22"/>
+        <line x1="9" y1="22" x2="15" y2="22"/>
+      </svg>
+    </button>
+
     <!-- 右：メトロノーム ON/OFF -->
     <button class="metro-toggle-btn" id="metro-toggle" aria-label="メトロノーム スタート/ストップ">
       <svg class="metro-btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -541,5 +583,6 @@
   <script src="js/settings.js"></script>
   <script src="js/analysis.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/recorder.js"></script>
 </body>
 </html>

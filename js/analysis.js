@@ -63,6 +63,7 @@ let _chunks           = [];    // ファイルスライスチャンク配列
 let _chunkTranscripts = [];    // チャンクごとの文字起こし
 let _failedChunkIndex = -1;    // エラーが発生したチャンクのインデックス
 let wakeLock          = null;  // スリープ抑止ロック
+let _inputMode         = 'file'; // 'file' | 'record'
 
 // ─── チップ・カードのソート順定義 ──────────────
 
@@ -184,6 +185,98 @@ function initAnalysis() {
       exportShareHtml({ ..._currentResult, transcript: _currentTranscript });
     }
   });
+
+  // ─── 入力方式セグメント切り替え（要件3） ─────────────
+  document.querySelectorAll('#analysis-input-mode .segment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#analysis-input-mode .segment-btn')
+        .forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _inputMode = btn.dataset.mode;
+      _applyInputModeDisplay();
+    });
+  });
+
+  // ─── 録音ボタン（要件4） ──────────────────────────
+  const recordBtn = document.getElementById('record-btn');
+
+  async function _onRecordDown(e) {
+    e.preventDefault();
+    try {
+      if (window.recorder.state === 'idle') {
+        await window.recorder.start();
+      } else if (window.recorder.state === 'paused') {
+        window.recorder.resume();
+      }
+    } catch (_err) {
+      showToast('マイクにアクセスできませんでした');
+      return;
+    }
+    _updateRecordingUI();
+    _updateRecordingState();
+  }
+
+  function _onRecordUp(e) {
+    e.preventDefault();
+    window.recorder.pause();
+    _updateRecordingUI();
+    _updateRecordingState();
+  }
+
+  recordBtn.addEventListener('touchstart', _onRecordDown, { passive: false });
+  recordBtn.addEventListener('mousedown',  _onRecordDown);
+  recordBtn.addEventListener('touchend',   _onRecordUp,   { passive: false });
+  recordBtn.addEventListener('mouseup',    _onRecordUp);
+  recordBtn.addEventListener('contextmenu', e => e.preventDefault());
+
+  // ─── クリアボタン（要件4） ──────────────────────
+  document.getElementById('record-clear-btn').addEventListener('click', () => {
+    window.recorder.clear();
+    _updateRecordingUI();
+    _updateRecordingState();
+  });
+
+  // ─── ファイル保存ボタン（要件4） ──────────────────
+  document.getElementById('record-save-btn').addEventListener('click', async () => {
+    const blob = await window.recorder.stop();
+    if (!blob || blob.size === 0) { showToast('録音データがありません'); return; }
+    const now = new Date();
+    const ts  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = `recording_${ts}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    _updateRecordingUI();
+    _updateRecordingState();
+  });
+
+  // ─── 解析スタートボタン（要件5） ─────────────────
+  document.getElementById('record-analyze-btn').addEventListener('click', async () => {
+    const blob = await window.recorder.stop();
+    if (!blob || blob.size === 0) { showToast('録音データがありません'); return; }
+    const now = new Date();
+    const ts  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'mp4' : 'webm';
+    _audioFile = new File([blob], `recorded_audio_${ts}.${ext}`, { type: blob.type, lastModified: now.getTime() });
+    _updateRecordingUI();
+    _updateRecordingState();
+    _startAnalysis();
+  });
+}
+
+function _applyInputModeDisplay() {
+  const formEl   = document.getElementById('analysis-form');
+  const recordEl = document.getElementById('analysis-record-panel');
+  if (_inputMode === 'record') {
+    formEl.style.display   = 'none';
+    recordEl.style.display = 'block';
+  } else {
+    formEl.style.display   = 'block';
+    recordEl.style.display = 'none';
+  }
 }
 
 function _updateConnectivityUI() {
@@ -196,20 +289,36 @@ function _updateConnectivityUI() {
     noKeyEl.style.display   = 'block';
     offlineEl.style.display = 'none';
     formEl.style.display    = 'none';
+    document.getElementById('analysis-record-panel').style.display = 'none';
     _showDemoSession();
   } else if (!navigator.onLine) {
     noKeyEl.style.display   = 'none';
     offlineEl.style.display = 'block';
-    formEl.style.display    = 'block';
+    _applyInputModeDisplay();
     if (_currentResult === null) _clearAnalysisState();
     _updateStartBtn();
   } else {
     noKeyEl.style.display   = 'none';
     offlineEl.style.display = 'none';
-    formEl.style.display    = 'block';
+    _applyInputModeDisplay();
     if (_currentResult === null) _clearAnalysisState();
     _updateStartBtn();
   }
+}
+
+function _updateRecordingUI() {
+  if (!window.recorder) return;
+  const state    = window.recorder.state;
+  const isRec    = state === 'recording';
+  const isPaused = state === 'paused';
+  const recordBtn      = document.getElementById('record-btn');
+  const recordBtnLabel = document.getElementById('record-btn-label');
+  if (recordBtn)      recordBtn.classList.toggle('recording', isRec);
+  if (recordBtnLabel) recordBtnLabel.textContent = isRec ? '一時停止' : (isPaused ? '再開' : '録音');
+  const analyzeBtn = document.getElementById('record-analyze-btn');
+  const saveBtn    = document.getElementById('record-save-btn');
+  if (analyzeBtn) analyzeBtn.style.display = isPaused ? 'block' : 'none';
+  if (saveBtn)    saveBtn.style.display    = isPaused ? 'block' : 'none';
 }
 
 function _updateStartBtn() {

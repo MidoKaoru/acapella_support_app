@@ -2401,6 +2401,112 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
   flex-shrink: 0;
 }
 
+/* ===== 録音UI ===== */
+
+.record-btn-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 8px;
+}
+
+.record-btn {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: none;
+  background: var(--cta);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(8, 19, 26, 0.30);
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+
+.record-btn:active {
+  transform: scale(0.93);
+}
+
+.record-btn.recording {
+  background: var(--danger);
+  box-shadow: 0 4px 16px rgba(178, 35, 35, 0.40);
+  animation: recordBtnPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recordBtnPulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(178, 35, 35, 0.40); }
+  50%       { box-shadow: 0 4px 28px rgba(178, 35, 35, 0.80); }
+}
+
+.record-btn-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.record-clear-btn {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 44px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.record-clear-btn:active {
+  background: var(--danger-light);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* 共通コントローラーのマイクボタン */
+.ctrl-mic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  border-radius: 10px;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.15s;
+}
+
+.ctrl-mic-btn:active {
+  background: rgba(8, 19, 26, 0.06);
+}
+
+.ctrl-mic-btn.recording {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+  box-shadow: 0 2px 8px rgba(178, 35, 35, 0.35);
+}
+
+/* 録音中：画面全体フチの赤いパルス */
+@keyframes recordingBorderPulse {
+  0%, 100% { box-shadow: inset 0 0 0px transparent; }
+  50%       { box-shadow: inset 0 0 15px red; }
+}
+
+body.is-recording::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  animation: recordingBorderPulse 1.2s ease-in-out infinite;
+}
+
 /* ===== デスクトップ補完 ===== */
 @media (min-width: 600px) {
   .note-grid {

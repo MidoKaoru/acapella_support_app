@@ -505,6 +505,15 @@ function initSaveState() {
   });
 }
 
+// ─── 録音状態の共通更新（analysis.js からも参照） ────
+function _updateRecordingState() {
+  if (!window.recorder) return;
+  const isRec = window.recorder.state === 'recording';
+  document.body.classList.toggle('is-recording', isRec);
+  const micBtn = document.getElementById('ctrl-mic-btn');
+  if (micBtn) micBtn.classList.toggle('recording', isRec);
+}
+
 // ─── 全音停止（サブ画面を開く前などに呼ぶ） ──────────
 function stopAllSounds() {
   if (metronome.isPlaying) {
@@ -675,4 +684,36 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('rhythm-back-btn').addEventListener('click', closeRhythm);
   document.getElementById('open-rhythm-btn').addEventListener('click', openRhythm);
   initRhythmSwipe();
+
+  // ─── AudioRecorder ───────────────────────────
+  window.recorder = new AudioRecorder();
+
+  const ctrlMicBtn = document.getElementById('ctrl-mic-btn');
+
+  async function _onMicDown(e) {
+    e.preventDefault();
+    try {
+      if (window.recorder.state === 'idle') {
+        await window.recorder.start();
+      } else if (window.recorder.state === 'paused') {
+        window.recorder.resume();
+      }
+    } catch (_err) {
+      showToast('マイクにアクセスできませんでした');
+      return;
+    }
+    _updateRecordingState();
+  }
+
+  function _onMicUp(e) {
+    e.preventDefault();
+    window.recorder.pause();
+    _updateRecordingState();
+  }
+
+  ctrlMicBtn.addEventListener('touchstart', _onMicDown, { passive: false });
+  ctrlMicBtn.addEventListener('mousedown',  _onMicDown);
+  ctrlMicBtn.addEventListener('touchend',   _onMicUp,   { passive: false });
+  ctrlMicBtn.addEventListener('mouseup',    _onMicUp);
+  ctrlMicBtn.addEventListener('contextmenu', e => e.preventDefault());
 });
