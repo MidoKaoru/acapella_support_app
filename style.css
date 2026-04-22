@@ -1117,6 +1117,13 @@ input.bpm-slider::-moz-range-track {
   background: var(--bg);
 }
 
+.settings-version {
+  margin-top: 32px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 /* ===== ハンバーガーメニュー ===== */
 
 .hamburger-btn {

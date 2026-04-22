@@ -27,8 +27,21 @@ function closeSettings() {
 
 // ─── UI をストレージの値で初期化 ─────────────
 
+async function _displayVersion() {
+  const el = document.getElementById('settings-version');
+  if (!el) return;
+  try {
+    const text = await (await fetch('sw.js?_=' + Date.now())).text();
+    const m = text.match(/const CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+    el.textContent = m ? m[1] : '';
+  } catch {
+    el.textContent = '';
+  }
+}
+
 function _refreshUI() {
   const s = getSettings();
+  _displayVersion();
 
   // 基準周波数
   document.getElementById('settings-freq-slider').value = s.baseFreq;
