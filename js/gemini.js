@@ -135,7 +135,7 @@ class GeminiAudioAnalyzer {
 
   // ─── ①-2 アクティベーション待機（ポーリング） ──
 
-  async waitForFileActive(fileName, timeoutMs = 120_000) {
+  async waitForFileActive(fileName, timeoutMs = 300_000) {
     const url      = `${this.baseUrl}/${fileName}`;
     const deadline = Date.now() + timeoutMs;
 

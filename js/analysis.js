@@ -46,6 +46,7 @@ let _pendingAnalysis  = false;  // 曲0件で解析スタートした際の解�
 let _chunks           = [];    // ファイルスライスチャンク配列
 let _chunkTranscripts = [];    // チャンクごとの文字起こし
 let _failedChunkIndex = -1;    // エラーが発生したチャンクのインデックス
+let wakeLock          = null;  // スリープ抑止ロック
 
 // ─── チップ・カードのソート順定義 ──────────────
 
@@ -91,6 +92,13 @@ function initAnalysis() {
 
   window.addEventListener('online',  _updateConnectivityUI);
   window.addEventListener('offline', _updateConnectivityUI);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' &&
+        ['uploading', 'waiting', 'transcribing'].includes(_state)) {
+      showToast('バックグラウンドで処理が中断された可能性があります');
+    }
+  });
 
   const fileInput = document.getElementById('analysis-file');
   const startBtn  = document.getElementById('analysis-start-btn');
@@ -480,15 +488,23 @@ async function _runAnalysis(groupId, songId) {
   document.getElementById('analysis-transcript-wrap').style.display = 'none';
   _activeFilters = { parts: [], categories: [], sections: [], favorite: false };
 
-  const CHUNK_SIZE = 25 * 1024 * 1024; // 25MB
-  _chunks = [];
-  for (let offset = 0; offset < _audioFile.size; offset += CHUNK_SIZE) {
-    _chunks.push(_audioFile.slice(offset, Math.min(offset + CHUNK_SIZE, _audioFile.size)));
-  }
+  _chunks = [_audioFile];
   _chunkTranscripts = new Array(_chunks.length).fill(null);
   _failedChunkIndex = -1;
 
   await _processChunksFrom(0);
+}
+
+async function _acquireWakeLock() {
+  if (!navigator.wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => {
+      if (!['idle', 'done', 'error'].includes(_state)) {
+        _acquireWakeLock();
+      }
+    });
+  } catch (_) {}
 }
 
 async function _processChunksFrom(startIndex) {
@@ -502,11 +518,9 @@ async function _processChunksFrom(startIndex) {
     return;
   }
 
-  let wakeLock = null;
   try {
-    if (navigator.wakeLock) {
-      try { wakeLock = await navigator.wakeLock.request('screen'); } catch (_) {}
-    }
+    await _acquireWakeLock();
+    showToast('処理中は画面をスリープさせないでください');
 
     for (let i = startIndex; i < total; i++) {
       const chunkLabel = total > 1 ? `(${i + 1}/${total})` : null;
@@ -515,7 +529,7 @@ async function _processChunksFrom(startIndex) {
       try {
         _setState('uploading');
         _setStepStatus('uploading', 'running', chunkLabel);
-        const chunkFile = new File([_chunks[i]], _audioFile.name, { type: _audioFile.type });
+        const chunkFile = _audioFile;
         const { fileUri, mimeType, fileName } = await analyzer.uploadAudioFile(chunkFile);
         uploadedFileName = fileName;
         _setStepStatus('uploading', 'done', chunkLabel);
