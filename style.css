@@ -1459,6 +1459,39 @@ input.bpm-slider::-moz-range-track {
   cursor: default;
 }
 
+/* ドラッグハンドル */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  cursor: grab;
+  border-left: 1px solid var(--border);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  background: rgba(8, 19, 26, 0.04);
+}
+
+/* SortableJS ドラッグ状態 */
+.sortable-ghost {
+  opacity: 0.4;
+  background: var(--primary-light) !important;
+  box-shadow: none;
+}
+
+.sortable-drag {
+  box-shadow: var(--shadow-modal) !important;
+  border-radius: 12px;
+  opacity: 1;
+}
+
 /* エクスポート・インポート */
 .library-io-row {
   display: flex;
@@ -2084,10 +2117,8 @@ details[open] .analysis-transcript-summary::before { content: '▼ '; }
   padding: 14px 16px;
   margin-bottom: 10px;
   box-shadow: var(--shadow-card);
-  border-left: 4px solid var(--border-strong);
+  border-left: 4px solid var(--primary);
 }
-.analysis-card.high   { border-left-color: var(--danger); }
-.analysis-card.normal { border-left-color: var(--primary); }
 
 /* カードヘッダー（メタ＋スターボタン） */
 .analysis-card-header {

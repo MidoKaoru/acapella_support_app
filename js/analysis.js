@@ -21,15 +21,15 @@ const DEMO_SESSION = {
   recorded_at: '2023年10月27日',
   transcript: 'えっと。\nえっと、ベースの、え、ピッチがちょっと気になってて、経過音がちょっと雑になってる気がするので、うん、もう少し、え、1個1個の音の発声をもう少しクリアに硬く、えー、出してほしいです。で、えーと、リードに関しては、ちょっとコーラスに埋もれ気味な感覚があるから、もう少し硬い発声、硬くて前に、え、出るような発声をちょっと心がけてみてほしいです。で、え、サードはちょっとピッチが下がってる気がするので、もう少しあの、えー、トップやベース、え、セカンドと分けてもいいのかな。ま、うまくその、周りの調整をもう少し聞きながら、えー、歌うっていうのを心がけつつ、自分の、えっと、自分の骨伝導で聞こえる音というよりは、機材を通して外から聞こえる音をちゃんと耳で聞きに行くっていう意識を持ってほしいです。で、トップに関してはちょっとピッチが上ずってるのと、あと音の立ち上がりが遅くて、うん、と、少し、えっと、フレーズが潰れてるのと、ちょっと後ろに持たってる感覚があるから、もう少しこう、音の立ち上がりをジャストで、えーと、なるようにすると、え、和音ももっとクリアになると思うし、えっと、リズムもパキッと出てくるんじゃないかな。で、えーと、パーカスに関しては、この曲が、えー、割とこう、コーラス陣が遊びを入れるからこそ、もう少しこうどっしりと構えてほしいというか。え、構えてほしい感じがあって、というのが、今、少し、えーと、フィルインを入れるタイミングとかでテンポが前後にこうブレてる感覚があるので、もう少しこう、ジャストのタイミングでメトロノーム通りに、え、テンポを刻むっていうのをまずが意識してほしい。ってのは感じました。',
   cards: [
-    { id: 'card-1', section: '全体', part: ['ベース'], category: 'ピッチ', importance: 'normal',
+    { id: 'card-1', section: ['全体'], part: ['ベース'], category: ['ピッチ'],
       text: 'ピッチがちょっと気になってて、経過音がちょっと雑になってる気がするので、もう少し1個1個の音の発声をクリアに硬く出してほしいです。' },
-    { id: 'card-2', section: '全体', part: ['リード'], category: 'ダイナミクス', importance: 'normal',
+    { id: 'card-2', section: ['全体'], part: ['リード'], category: ['ダイナミクス'],
       text: 'コーラスに埋もれ気味な感覚があるから、もう少し硬く前に出るような発声を心がけてみてほしいです。' },
-    { id: 'card-3', section: '全体', part: ['サード'], category: 'ピッチ', importance: 'normal',
+    { id: 'card-3', section: ['全体'], part: ['サード'], category: ['ピッチ'],
       text: 'ピッチが下がっている。もう少しトップやベースとハモる意識をもって、周りを聴きながら歌うことを心がけて。自分の骨伝導で聞こえる音より、機材を通して外から聞こえる音を聴く意識を持つ。' },
-    { id: 'card-5', section: '全体', part: ['トップ'], category: 'リズム', importance: 'normal',
+    { id: 'card-5', section: ['全体'], part: ['トップ'], category: ['リズム'],
       text: '音の立ち上がりが遅く、フレーズが潰れていて、後ろにモタっている。音の立ち上がりを早くし、ジャストで鳴るようにすると、和音がもっとクリアになる。リズムもパキッと出てくる。' },
-    { id: 'card-6', section: '全体', part: ['パーカス'], category: 'リズム', importance: 'normal',
+    { id: 'card-6', section: ['全体'], part: ['パーカス'], category: ['リズム'],
       text: 'コーラス陣が遊びを入れる曲だからこそ、もう少しどっしりと構えてほしい。フィルインを入れるタイミングなどでテンポが前後にブレるので、ジャストのタイミングでテンポキープすることをまず意識する。' },
   ],
 };
@@ -838,8 +838,8 @@ function _renderResults(result) {
 
   const cards = result.cards || [];
   const parts = _sortParts([...new Set(cards.flatMap(c => c.part))]);
-  const cats  = _sortCats([...new Set(cards.map(c => c.category))]);
-  const secs  = _sortSecs([...new Set(cards.map(c => c.section))]);
+  const cats  = _sortCats([...new Set(cards.flatMap(c => Array.isArray(c.category) ? c.category : (c.category ? [c.category] : [])))]);
+  const secs  = _sortSecs([...new Set(cards.flatMap(c => Array.isArray(c.section)  ? c.section  : (c.section  ? [c.section]  : [])))]);
 
   _buildChips('analysis-part-chips', parts, 'parts');
   _buildChips('analysis-cat-chips',  cats,  'categories');
@@ -879,9 +879,9 @@ function _applyFilter() {
   if (!_currentResult) return;
   const { parts, categories, sections, favorite } = _activeFilters;
   const filtered = (_currentResult.cards || []).filter(card => {
-    const partOk = parts.length === 0     || parts.some(p => card.part.includes(p));
-    const catOk  = categories.length === 0 || categories.includes(card.category);
-    const secOk  = sections.length === 0   || sections.includes(card.section);
+    const partOk = parts.length === 0      || parts.some(p => card.part.includes(p));
+    const catOk  = categories.length === 0 || categories.some(c => (Array.isArray(card.category) ? card.category : [card.category]).includes(c));
+    const secOk  = sections.length === 0   || sections.some(s => (Array.isArray(card.section)  ? card.section  : [card.section]).includes(s));
     const favOk  = !favorite               || card.isFavorite === true;
     return partOk && catOk && secOk && favOk;
   });
@@ -929,14 +929,14 @@ function _renderCards(cards) {
 
   cards.forEach(card => {
     const div = document.createElement('div');
-    div.className = `analysis-card ${card.importance}`;
+    div.className = 'analysis-card';
 
     const header = document.createElement('div');
     header.className = 'analysis-card-header';
 
     const meta = document.createElement('div');
     meta.className   = 'analysis-card-meta editable-tag';
-    meta.textContent = `${card.section} ｜ ${card.part.join(' / ')} ｜ ${card.category}`;
+    meta.textContent = `${(Array.isArray(card.section) ? card.section : [card.section]).join(' / ')} ｜ ${card.part.join(' / ')} ｜ ${(Array.isArray(card.category) ? card.category : [card.category]).join(' / ')}`;
     meta.addEventListener('click', (e) => {
       e.stopPropagation();
       _openCardEditSheet({
@@ -1022,7 +1022,7 @@ async function _shareAsText(result) {
 
   const lines = [`【${name}】${date ? ' ' + date : ''}`, ''];
   cards.forEach(card => {
-    lines.push(`▶ ${card.section} ｜ ${(card.part || []).join(' / ')} ｜ ${card.category}`);
+    lines.push(`▶ ${(Array.isArray(card.section) ? card.section : (card.section ? [card.section] : [])).join(' / ')} ｜ ${(card.part || []).join(' / ')} ｜ ${(Array.isArray(card.category) ? card.category : (card.category ? [card.category] : [])).join(' / ')}`);
     lines.push(card.text || '');
     lines.push('');
   });
@@ -1135,8 +1135,9 @@ const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 let filters = { parts:[], categories:[], sections:[], favorite:false };
 const cards = SESSION.cards || [];
 const parts = sortParts([...new Set(cards.flatMap(c => c.part||[]))]);
-const cats  = sortCats([...new Set(cards.map(c => c.category).filter(Boolean))]);
-const secs  = sortSecs([...new Set(cards.map(c => c.section).filter(Boolean))]);
+const cats  = sortCats([...new Set(cards.flatMap(c => Array.isArray(c.category)?c.category:(c.category?[c.category]:[])))]);
+const secs  = sortSecs([...new Set(cards.flatMap(c => Array.isArray(c.section)?c.section:(c.section?[c.section]:[])))]);
+
 const hasFilterData = parts.length > 0 || cats.length > 0 || secs.length > 0;
 if (hasFilterData) document.getElementById('filter-area').style.display = '';
 
@@ -1151,8 +1152,8 @@ function renderCards() {
     ? cards
     : cards.filter(c => {
         const partOk = pf.length===0 || pf.some(p => (c.part||[]).includes(p));
-        const catOk  = cf.length===0 || cf.includes(c.category);
-        const secOk  = sf.length===0 || sf.includes(c.section);
+        const catOk  = cf.length===0 || cf.some(f => (Array.isArray(c.category)?c.category:(c.category?[c.category]:[])).includes(f));
+        const secOk  = sf.length===0 || sf.some(f => (Array.isArray(c.section)?c.section:(c.section?[c.section]:[])).includes(f));
         const favOk  = !fv || c.isFavorite===true;
         return partOk && catOk && secOk && favOk;
       });
@@ -1160,9 +1161,9 @@ function renderCards() {
   const area = document.getElementById('cards-area');
   if (filtered.length===0) { area.innerHTML='<p class="analysis-empty">条件に合うカードがありません</p>'; return; }
   area.innerHTML = filtered.map(c => \`
-    <div class="analysis-card \${esc(c.importance||'')}">
+    <div class="analysis-card">
       <div class="analysis-card-header">
-        <div class="analysis-card-meta">\${esc(c.section||'')} ｜ \${esc((c.part||[]).join(' / '))} ｜ \${esc(c.category||'')}</div>
+        <div class="analysis-card-meta">\${esc((Array.isArray(c.section)?c.section:(c.section?[c.section]:[])).join(' / '))} ｜ \${esc((c.part||[]).join(' / '))} ｜ \${esc((Array.isArray(c.category)?c.category:(c.category?[c.category]:[])).join(' / '))}</div>
         \${c.isFavorite ? '<span class="card-fav-btn active" aria-label="お気に入り"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>' : ''}
       </div>
       <p class="analysis-card-text">\${esc(c.text||'')}</p>
@@ -1394,8 +1395,8 @@ function _refreshAnalysisView() {
   if (!_currentResult) return;
   const allCards = _currentResult.cards || [];
   const parts = _sortParts([...new Set(allCards.flatMap(c => c.part || []))]);
-  const cats  = _sortCats([...new Set(allCards.map(c => c.category).filter(Boolean))]);
-  const secs  = _sortSecs([...new Set(allCards.map(c => c.section).filter(Boolean))]);
+  const cats  = _sortCats([...new Set(allCards.flatMap(c => Array.isArray(c.category) ? c.category : (c.category ? [c.category] : [])))]);
+  const secs  = _sortSecs([...new Set(allCards.flatMap(c => Array.isArray(c.section)  ? c.section  : (c.section  ? [c.section]  : [])))]);
   _buildChips('analysis-part-chips', parts, 'parts');
   _buildChips('analysis-cat-chips',  cats,  'categories');
   _buildChips('analysis-sec-chips',  secs,  'sections');
@@ -1410,11 +1411,11 @@ function _openCardEditSheet(opts) {
 
   const { card: existingCard, existingCards = [], onSave } = opts;
   const isNew = !existingCard;
-  const card  = existingCard || { section: '', part: [], category: '', importance: 'normal', text: '' };
+  const card  = existingCard || { section: [], part: [], category: [], text: '' };
 
-  const existingSections = _sortSecs([...new Set(existingCards.map(c => c.section).filter(Boolean))]);
+  const existingSections = _sortSecs([...new Set(existingCards.flatMap(c => Array.isArray(c.section)  ? c.section  : (c.section  ? [c.section]  : [])))]);
   const existingParts    = _sortParts([...new Set(existingCards.flatMap(c => c.part || []))]);
-  const existingCats     = _sortCats([...new Set(existingCards.map(c => c.category).filter(Boolean))]);
+  const existingCats     = _sortCats([...new Set(existingCards.flatMap(c => Array.isArray(c.category) ? c.category : (c.category ? [c.category] : [])))]);
 
   const DEFAULT_SECS  = ['全体', 'Aメロ', 'Bメロ', 'サビ', 'その他'];
   const DEFAULT_PARTS = ['リード', 'トップ', 'セカンド', 'サード', 'フォース', 'ベース', 'パーカス'];
@@ -1424,10 +1425,9 @@ function _openCardEditSheet(opts) {
   const allParts = _sortParts([...new Set([...DEFAULT_PARTS, ...existingParts])]);
   const allCats  = _sortCats([...new Set([...DEFAULT_CATS, ...existingCats])]);
 
-  let selSection = card.section || '';
-  let selParts   = [...(card.part || [])];
-  let selCat     = card.category || '';
-  let selImp     = card.importance || 'normal';
+  let selSections = Array.isArray(card.section)  ? [...card.section]  : (card.section  ? [card.section]  : []);
+  let selParts    = [...(card.part || [])];
+  let selCats     = Array.isArray(card.category) ? [...card.category] : (card.category ? [card.category] : []);
 
   const overlay = document.createElement('div');
   overlay.id        = 'card-edit-overlay';
@@ -1444,23 +1444,18 @@ function _openCardEditSheet(opts) {
     <div class="menu-sheet-handle"></div>
     <div class="card-edit-sheet-body">
       <div class="report-sheet-content">
-        <h3 class="report-sheet-title">${isNew ? 'カードを追加' : 'カードを編集'}</h3>
-
-        <div class="control-group card-edit-field">
-          <span class="control-label">重要度</span>
-          <div class="segment-control" id="cef-importance" role="group" aria-label="重要度">
-            <button class="segment-btn${selImp !== 'high' ? ' active' : ''}" data-val="normal">通常</button>
-            <button class="segment-btn${selImp === 'high' ? ' active' : ''}" data-val="high">高い</button>
-          </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <h3 class="report-sheet-title" style="margin:0;flex:1;">${isNew ? 'カードを追加' : 'カードを編集'}</h3>
+          <button class="card-fav-btn${card.isFavorite ? ' active' : ''}" id="cef-fav-btn" aria-label="お気に入り"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></button>
         </div>
 
         <div class="control-group card-edit-field">
-          <span class="control-label">セクション</span>
+          <span class="control-label">セクション（複数選択可）</span>
           <div class="card-edit-chips" id="cef-sec-chips">
-            ${allSecs.map(s => `<button class="card-edit-chip${s === selSection ? ' active' : ''}" data-val="${_esc(s)}">${_esc(s)}</button>`).join('')}
+            ${allSecs.map(s => `<button class="card-edit-chip${selSections.includes(s) ? ' active' : ''}" data-val="${_esc(s)}">${_esc(s)}</button>`).join('')}
           </div>
           <input type="text" class="edit-text-input card-edit-tag-input" id="cef-sec-input"
-            placeholder="新規セクション...">
+            placeholder="新規セクション名を入力してEnter">
         </div>
 
         <div class="control-group card-edit-field">
@@ -1473,12 +1468,12 @@ function _openCardEditSheet(opts) {
         </div>
 
         <div class="control-group card-edit-field">
-          <span class="control-label">カテゴリ</span>
+          <span class="control-label">カテゴリ（複数選択可）</span>
           <div class="card-edit-chips" id="cef-cat-chips">
-            ${allCats.map(c => `<button class="card-edit-chip${c === selCat ? ' active' : ''}" data-val="${_esc(c)}">${_esc(c)}</button>`).join('')}
+            ${allCats.map(c => `<button class="card-edit-chip${selCats.includes(c) ? ' active' : ''}" data-val="${_esc(c)}">${_esc(c)}</button>`).join('')}
           </div>
           <input type="text" class="edit-text-input card-edit-tag-input" id="cef-cat-input"
-            placeholder="新規カテゴリ...">
+            placeholder="新規カテゴリ名を入力してEnter">
         </div>
 
         <div class="control-group card-edit-field">
@@ -1496,23 +1491,40 @@ function _openCardEditSheet(opts) {
   document.body.appendChild(overlay);
   document.body.appendChild(sheet);
 
-  // 重要度トグル
-  sheet.querySelectorAll('#cef-importance .segment-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      sheet.querySelectorAll('#cef-importance .segment-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selImp = btn.dataset.val;
+  // セクション（複数選択）
+  sheet.querySelectorAll('#cef-sec-chips .card-edit-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+      const val = chip.dataset.val;
+      const idx = selSections.indexOf(val);
+      if (idx === -1) selSections.push(val); else selSections.splice(idx, 1);
     });
   });
 
-  // セクション（単一選択）
-  sheet.querySelectorAll('#cef-sec-chips .card-edit-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      sheet.querySelectorAll('#cef-sec-chips .card-edit-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      selSection = chip.dataset.val;
-    });
-  });
+  const secInput = sheet.querySelector('#cef-sec-input');
+  const _addNewSecChip = () => {
+    const val = secInput.value.trim();
+    if (!val) return;
+    secInput.value = '';
+    if (!selSections.includes(val)) selSections.push(val);
+    const existing = sheet.querySelector(`#cef-sec-chips .card-edit-chip[data-val="${val}"]`);
+    if (existing) {
+      existing.classList.add('active');
+    } else {
+      const newChip = document.createElement('button');
+      newChip.className   = 'card-edit-chip active';
+      newChip.dataset.val = val;
+      newChip.textContent = val;
+      newChip.type        = 'button';
+      newChip.addEventListener('click', () => {
+        newChip.classList.toggle('active');
+        const i = selSections.indexOf(val);
+        if (i === -1) selSections.push(val); else selSections.splice(i, 1);
+      });
+      sheet.querySelector('#cef-sec-chips').appendChild(newChip);
+    }
+  };
+  secInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); _addNewSecChip(); } });
 
   // パート（複数選択）
   sheet.querySelectorAll('#cef-part-chips .card-edit-chip').forEach(chip => {
@@ -1550,35 +1562,72 @@ function _openCardEditSheet(opts) {
   };
   partInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); _addNewPartChip(); } });
 
-  // カテゴリ（単一選択）
+  // カテゴリ（複数選択）
   sheet.querySelectorAll('#cef-cat-chips .card-edit-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      sheet.querySelectorAll('#cef-cat-chips .card-edit-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      selCat = chip.dataset.val;
+      chip.classList.toggle('active');
+      const val = chip.dataset.val;
+      const idx = selCats.indexOf(val);
+      if (idx === -1) selCats.push(val); else selCats.splice(idx, 1);
     });
   });
+
+  const catInput = sheet.querySelector('#cef-cat-input');
+  const _addNewCatChip = () => {
+    const val = catInput.value.trim();
+    if (!val) return;
+    catInput.value = '';
+    if (!selCats.includes(val)) selCats.push(val);
+    const existing = sheet.querySelector(`#cef-cat-chips .card-edit-chip[data-val="${val}"]`);
+    if (existing) {
+      existing.classList.add('active');
+    } else {
+      const newChip = document.createElement('button');
+      newChip.className   = 'card-edit-chip active';
+      newChip.dataset.val = val;
+      newChip.textContent = val;
+      newChip.type        = 'button';
+      newChip.addEventListener('click', () => {
+        newChip.classList.toggle('active');
+        const i = selCats.indexOf(val);
+        if (i === -1) selCats.push(val); else selCats.splice(i, 1);
+      });
+      sheet.querySelector('#cef-cat-chips').appendChild(newChip);
+    }
+  };
+  catInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); _addNewCatChip(); } });
 
   const close = () => { sheet.remove(); overlay.remove(); };
   overlay.addEventListener('click', close);
   sheet.querySelector('#cef-cancel').addEventListener('click', close);
 
+  let _sx = 0, _sy = 0;
+  sheet.addEventListener('touchstart', e => { _sx = e.touches[0].clientX; _sy = e.touches[0].clientY; }, { passive: true });
+  sheet.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - _sx;
+    const dy = e.changedTouches[0].clientY - _sy;
+    if (dy > 50 && dy > Math.abs(dx)) close();
+  }, { passive: true });
+
+  sheet.querySelector('#cef-fav-btn').addEventListener('click', () => {
+    card.isFavorite = !card.isFavorite;
+    sheet.querySelector('#cef-fav-btn').classList.toggle('active', card.isFavorite);
+  });
+
   sheet.querySelector('#cef-save').addEventListener('click', () => {
     _addNewPartChip();
-    const secInput  = sheet.querySelector('#cef-sec-input').value.trim();
-    const catInput  = sheet.querySelector('#cef-cat-input').value.trim();
-    const finalSec  = secInput  || selSection;
-    const finalCat  = catInput  || selCat;
+    _addNewSecChip();
+    _addNewCatChip();
     const finalText = sheet.querySelector('#cef-text').value;
 
-    if (!finalSec)              { showToast('セクションを選択または入力してください'); return; }
-    if (selParts.length === 0)  { showToast('パートを選択または入力してください');     return; }
-    if (!finalCat)              { showToast('カテゴリを選択または入力してください');   return; }
+    if (selSections.length === 0) { showToast('セクションを選択または入力してください'); return; }
+    if (selParts.length === 0)    { showToast('パートを選択または入力してください');     return; }
+    if (selCats.length === 0)     { showToast('カテゴリを選択または入力してください');   return; }
+    if (!finalText.trim())        { showToast('内容を入力してください');                 return; }
 
-    card.section    = finalSec;
+    card.section    = [...selSections];
     card.part       = [...selParts];
-    card.category   = finalCat;
-    card.importance = selImp;
+    card.category   = [...selCats];
     card.text       = finalText;
 
     close();

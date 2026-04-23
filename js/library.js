@@ -225,11 +225,12 @@ function _renderGroups(content) {
     sorted.forEach((g, idx) => {
       const showMove = _groupSort === 'manual' && sorted.length >= 2 && _isGroupSortEditing;
       const moveBtns = showMove ? `
-        <div class="library-card-sort-col">
-          <button class="library-card-sort-btn" data-action="move-group-up"
-            data-id="${_esc(g.id)}" ${idx === 0 ? 'disabled' : ''} aria-label="上へ">▲</button>
-          <button class="library-card-sort-btn" data-action="move-group-down"
-            data-id="${_esc(g.id)}" ${idx === sorted.length - 1 ? 'disabled' : ''} aria-label="下へ">▼</button>
+        <div class="drag-handle" aria-label="ドラッグして並び替え">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="4" y1="8" x2="20" y2="8"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="16" x2="20" y2="16"/>
+          </svg>
         </div>` : '';
       html += `<div class="library-card">
         <button class="library-card-main" data-action="open-songs" data-group-id="${_esc(g.id)}">
@@ -293,12 +294,22 @@ function _renderGroups(content) {
     btn.addEventListener('click', () =>
       _navigate('group-edit', { groupId: btn.dataset.groupId }));
   });
-  content.querySelectorAll('[data-action="move-group-up"]').forEach(btn => {
-    btn.addEventListener('click', () => _moveGroup(btn.dataset.id, -1));
-  });
-  content.querySelectorAll('[data-action="move-group-down"]').forEach(btn => {
-    btn.addEventListener('click', () => _moveGroup(btn.dataset.id, 1));
-  });
+  if (_isGroupSortEditing) {
+    const listEl = content.querySelector('.library-list');
+    if (listEl) {
+      Sortable.create(listEl, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: evt => {
+          const d = getSongs();
+          const [moved] = d.groups.splice(evt.oldIndex, 1);
+          d.groups.splice(evt.newIndex, 0, moved);
+          saveSongs(d);
+          _render(false);
+        },
+      });
+    }
+  }
   content.querySelector('[data-action="export"]')
     ?.addEventListener('click', _exportLibrary);
   const importBtn = content.querySelector('[data-action="import"]');
@@ -383,11 +394,12 @@ function _renderSongs(content, groupId) {
       const meta     = `${keysStr}　${s.bpm} BPM　${parseFloat(s.baseFreq).toFixed(1)} Hz　${s.timeSig || 4}拍子`;
       const showMove = _songSort === 'manual' && sorted.length >= 2 && _isSongSortEditing;
       const moveBtns = showMove ? `
-        <div class="library-card-sort-col">
-          <button class="library-card-sort-btn" data-action="move-song-up"
-            data-id="${_esc(s.id)}" ${idx === 0 ? 'disabled' : ''} aria-label="上へ">▲</button>
-          <button class="library-card-sort-btn" data-action="move-song-down"
-            data-id="${_esc(s.id)}" ${idx === sorted.length - 1 ? 'disabled' : ''} aria-label="下へ">▼</button>
+        <div class="drag-handle" aria-label="ドラッグして並び替え">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="4" y1="8" x2="20" y2="8"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="16" x2="20" y2="16"/>
+          </svg>
         </div>` : '';
       html += `<div class="library-card">
         <button class="library-card-main" data-action="open-detail" data-song-id="${_esc(s.id)}">
@@ -416,12 +428,25 @@ function _renderSongs(content, groupId) {
     btn.addEventListener('click', () =>
       _navigate('detail', { groupId, songId: btn.dataset.songId }));
   });
-  content.querySelectorAll('[data-action="move-song-up"]').forEach(btn => {
-    btn.addEventListener('click', () => _moveSong(groupId, btn.dataset.id, -1));
-  });
-  content.querySelectorAll('[data-action="move-song-down"]').forEach(btn => {
-    btn.addEventListener('click', () => _moveSong(groupId, btn.dataset.id, 1));
-  });
+  if (_isSongSortEditing) {
+    const listEl = content.querySelector('.library-list');
+    if (listEl) {
+      Sortable.create(listEl, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: evt => {
+          const d = getSongs();
+          const g = d.groups.find(g => g.id === groupId);
+          if (g) {
+            const [moved] = g.songs.splice(evt.oldIndex, 1);
+            g.songs.splice(evt.newIndex, 0, moved);
+            saveSongs(d);
+            _render(false);
+          }
+        },
+      });
+    }
+  }
 }
 
 // ─── 曲詳細ビュー ────────────────────────────
@@ -624,8 +649,8 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
   let libFilters = { parts: [], categories: [], sections: [], favorite: false };
 
   const parts = _sortParts([...new Set(cards.flatMap(c => c.part || []))]);
-  const cats  = _sortCats([...new Set(cards.map(c => c.category).filter(Boolean))]);
-  const secs  = _sortSecs([...new Set(cards.map(c => c.section).filter(Boolean))]);
+  const cats  = _sortCats([...new Set(cards.flatMap(c => Array.isArray(c.category) ? c.category : (c.category ? [c.category] : [])))]);
+  const secs  = _sortSecs([...new Set(cards.flatMap(c => Array.isArray(c.section)  ? c.section  : (c.section  ? [c.section]  : [])))]);
   const hasFilterData = parts.length > 0 || cats.length > 0 || secs.length > 0;
 
   const transcriptHtml = session.transcript
@@ -747,8 +772,8 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
       ? cards
       : cards.filter(card => {
           const partOk = pf.length === 0 || pf.some(p => (card.part || []).includes(p));
-          const catOk  = cf.length === 0 || cf.includes(card.category);
-          const secOk  = sf.length === 0 || sf.includes(card.section);
+          const catOk  = cf.length === 0 || cf.some(c => (Array.isArray(card.category) ? card.category : (card.category ? [card.category] : [])).includes(c));
+          const secOk  = sf.length === 0 || sf.some(s => (Array.isArray(card.section)  ? card.section  : (card.section  ? [card.section]  : [])).includes(s));
           const favOk  = !fv            || card.isFavorite === true;
           return partOk && catOk && secOk && favOk;
         });
@@ -761,11 +786,10 @@ function _renderSessionDetail(content, groupId, songId, sessionId) {
 
     cardsEl.innerHTML = '';
     filtered.forEach(card => {
-      const importance = card.importance || '';
-      const metaText = `${card.section || ''} ｜ ${(card.part || []).join(' / ')} ｜ ${card.category || ''}`;
+      const metaText = `${(Array.isArray(card.section) ? card.section : (card.section ? [card.section] : [])).join(' / ')} ｜ ${(card.part || []).join(' / ')} ｜ ${(Array.isArray(card.category) ? card.category : (card.category ? [card.category] : [])).join(' / ')}`;
 
       const cardDiv = document.createElement('div');
-      cardDiv.className = `analysis-card ${importance}`;
+      cardDiv.className = 'analysis-card';
 
       const headerDiv = document.createElement('div');
       headerDiv.className = 'analysis-card-header';
@@ -948,7 +972,7 @@ async function _libShareAsText(session) {
 
   const lines = [`【${name}】${date ? ' ' + date : ''}`, ''];
   cards.forEach(card => {
-    lines.push(`▶ ${card.section || ''} ｜ ${(card.part || []).join(' / ')} ｜ ${card.category || ''}`);
+    lines.push(`▶ ${(Array.isArray(card.section) ? card.section : (card.section ? [card.section] : [])).join(' / ')} ｜ ${(card.part || []).join(' / ')} ｜ ${(Array.isArray(card.category) ? card.category : (card.category ? [card.category] : [])).join(' / ')}`);
     lines.push(card.text || '');
     lines.push('');
   });
@@ -1301,30 +1325,6 @@ function _importLibrary(file) {
     }
   };
   reader.readAsText(file);
-}
-
-// ─── 並び順の手動変更 ─────────────────────────
-
-function _moveGroup(id, dir) {
-  const d   = getSongs();
-  const idx = d.groups.findIndex(g => g.id === id);
-  const to  = idx + dir;
-  if (to < 0 || to >= d.groups.length) return;
-  [d.groups[idx], d.groups[to]] = [d.groups[to], d.groups[idx]];
-  saveSongs(d);
-  _render(false);
-}
-
-function _moveSong(groupId, songId, dir) {
-  const d     = getSongs();
-  const group = d.groups.find(g => g.id === groupId);
-  if (!group) return;
-  const idx = group.songs.findIndex(s => s.id === songId);
-  const to  = idx + dir;
-  if (to < 0 || to >= group.songs.length) return;
-  [group.songs[idx], group.songs[to]] = [group.songs[to], group.songs[idx]];
-  saveSongs(d);
-  _render(false);
 }
 
 // ─── ユーティリティ ──────────────────────────

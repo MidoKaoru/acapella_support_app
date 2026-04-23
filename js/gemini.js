@@ -219,10 +219,9 @@ ${transcript}
               section:       { type: 'STRING' },
               part:          { type: 'ARRAY', items: { type: 'STRING' } },
               category:      { type: 'STRING', enum: ['ピッチ', 'リズム', 'ダイナミクス', '歌詞・発音', 'その他'] },
-              importance:    { type: 'STRING', enum: ['high', 'normal'] },
               text:          { type: 'STRING' },
             },
-            required: ['id', 'section', 'part', 'category', 'importance', 'text'],
+            required: ['id', 'section', 'part', 'category', 'text'],
           },
         },
       },
@@ -256,7 +255,9 @@ ${transcript}
       if (Array.isArray(result.cards)) {
         result.cards = result.cards.map(card => ({
           ...card,
-          text: normalizeMusicTerms(card.text),
+          text:     normalizeMusicTerms(card.text),
+          section:  [card.section],
+          category: [card.category],
         }));
       }
       return result;
