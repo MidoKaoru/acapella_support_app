@@ -691,12 +691,15 @@ async function _processChunksFrom(startIndex) {
         audio.src = objUrl;
       });
     } catch (_) {
-      audioDurationMinutes = 180;
+      audioDurationMinutes = _estimateDurationFromFileSize(_audioFile);
     }
 
     const segments = [];
     for (let start = 0; start < audioDurationMinutes; start += 30) {
-      segments.push({ startMin: start, endMin: start + 35 });
+      segments.push({
+        startMin: start,
+        endMin: Math.min(start + 32, audioDurationMinutes + 1),
+      });
     }
 
     let completedCount = 0;
@@ -722,7 +725,16 @@ async function _processChunksFrom(startIndex) {
 
     _setState('analyzing');
     _setStepStatus('analyzing', 'running');
-    const result = await analyzer.analyzeStructure(fullTranscript);
+    const practiceDate = document.getElementById('analysis-practice-date')?.value || '';
+    const song = getSongs().groups
+      .flatMap(g => g.songs)
+      .find(s => s.id === _pendingSongId);
+
+    const result = await analyzer.analyzeStructure(fullTranscript, {
+      practiceDate,
+      songTitle:  song?.title  || '',
+      groupName:  getSongs().groups.find(g => g.id === _pendingGroupId)?.name || '',
+    });
     _setStepStatus('analyzing', 'done');
 
     _currentResult     = result;
@@ -1666,6 +1678,46 @@ function _esc(str) {
 }
 
 // ─── 解析待ち状態の公開 API ──────────────────────
+
+/**
+ * ファイルの種別から「現実的な最低ビットレート」を使って再生時間（分）を推定する。
+ * 音声時間メタデータ取得失敗時のフォールバック専用。
+ * 過小評価（セグメント不足）を避けるため最低ビットレートを採用。
+ *
+ * @param {File} file
+ * @returns {number} 推定再生時間（分、切り上げ）
+ */
+function _estimateDurationFromFileSize(file) {
+  const ext    = file.name.split('.').pop().toLowerCase();
+  const mime   = (file.type || '').toLowerCase();
+  const sizeKb = file.size / 1024;
+
+  const bitrateMap = {
+    wav: 384, aiff: 384, flac: 400,
+    mp3: 64, aac: 64, m4a: 64,
+    ogg: 48, opus: 24, webm: 48, mp4: 64,
+  };
+
+  let bitrateKbps = 48;
+  if (bitrateMap[ext]) {
+    bitrateKbps = bitrateMap[ext];
+  } else if (mime.includes('wav') || mime.includes('aiff')) {
+    bitrateKbps = 384;
+  } else if (mime.includes('flac')) {
+    bitrateKbps = 400;
+  } else if (mime.includes('opus')) {
+    bitrateKbps = 24;
+  } else if (mime.includes('mp3') || mime.includes('mpeg')) {
+    bitrateKbps = 64;
+  } else if (mime.includes('aac') || mime.includes('m4a') || mime.includes('mp4')) {
+    bitrateKbps = 64;
+  }
+
+  // 分 = (サイズKb × 8) / (ビットレートkbps × 60)
+  // 安全マージン 1.2 倍・最低 5 分保証
+  const estimated = (sizeKb * 8) / (bitrateKbps * 60);
+  return Math.max(Math.ceil(estimated * 1.2), 5);
+}
 
 function isPendingAnalysis() { return _pendingAnalysis; }
 function clearPendingAnalysis() { _pendingAnalysis = false; }

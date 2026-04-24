@@ -82,6 +82,33 @@ class GeminiAudioAnalyzer {
     return candidate.content.parts[0].text;
   }
 
+  _deduplicateLoop(text, threshold = 3) {
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < threshold * 2) return text;
+
+    const result = [];
+    let consecutiveCount = 1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const cur  = lines[i].trim();
+      const prev = result.length > 0 ? result[result.length - 1].trim() : null;
+
+      if (cur === prev) {
+        consecutiveCount++;
+        if (consecutiveCount >= threshold) {
+          console.warn(`[deduplicateLoop] ループ検知: "${cur}" が ${consecutiveCount} 回連続`);
+          continue;
+        }
+      } else {
+        consecutiveCount = 1;
+      }
+
+      result.push(lines[i]);
+    }
+
+    return result.join('\n');
+  }
+
   // ─── ① ファイルアップロード（Resumable Upload） ─
 
   async uploadAudioFile(file) {
@@ -138,6 +165,7 @@ class GeminiAudioAnalyzer {
   async waitForFileActive(fileName, timeoutMs = 300_000) {
     const url      = `${this.baseUrl}/${fileName}`;
     const deadline = Date.now() + timeoutMs;
+    let pollInterval = 3000;
 
     while (Date.now() < deadline) {
       const res = await fetch(url, { headers: this._authHeaders });
@@ -147,7 +175,9 @@ class GeminiAudioAnalyzer {
       if (data.state === 'ACTIVE') return;
       if (data.state === 'FAILED') throw new Error('Googleサーバー側でのファイル処理に失敗しました。');
 
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      // 3000 → 4500 → 6750 → 10000 ms
+      pollInterval = Math.min(Math.floor(pollInterval * 1.5), 10000);
     }
     throw new Error('ファイルのアクティベーションがタイムアウトしました。');
   }
@@ -155,13 +185,24 @@ class GeminiAudioAnalyzer {
   // ─── ② 文字起こし ───────────────────────────
 
   async transcribeAudio(fileUri, mimeType, startMin, endMin) {
+    const promptText =
+      `この音声ファイルの${startMin}:00〜${endMin}:00の範囲内にある話し声だけを文字起こしして。` +
+      `なお ${endMin - 2}:00 以降は次のセグメントとオーバーラップする範囲のため、` +
+      `${endMin - 2}:00 以降の発言は特に省略せず丁寧に書き起こすこと。` +
+      `歌唱（コーラス、リードボーカル、ボイパなど）の部分は絶対に含めず完全に無視してください。`;
+
     const payload = {
       contents: [{
         parts: [
-          { text: `この音声ファイルの${startMin}:00〜${endMin}:00の範囲内にある話し声だけを文字起こしして。歌唱（コーラス、リードボーカル、ボイパなど）の部分は絶対に文字起こしに含めず、完全に無視してください。` },
+          { text: promptText },
           { file_data: { file_uri: fileUri, mime_type: mimeType } },
         ],
       }],
+      generationConfig: {
+        temperature:      0.2,
+        frequencyPenalty: 0.5,
+        presencePenalty:  0.3,
+      },
     };
 
     const response = await this._fetchForGenerate({
@@ -174,27 +215,46 @@ class GeminiAudioAnalyzer {
     const rawText = this._extractTextFromResponse(data);
 
     return normalizeMusicTerms(
-      rawText
-        .replace(/\n{2,}/g, '\n')
-        .trim()
+      this._deduplicateLoop(
+        rawText.replace(/\n{2,}/g, '\n').trim()
+      )
     );
   }
 
   // ─── ③ 構造化解析（JSON生成） ───────────────
 
-  async analyzeStructure(transcript) {
+  async analyzeStructure(transcript, { practiceDate = '', songTitle = '', groupName = '' } = {}) {
+    const contextLine = [
+      practiceDate && `練習日: ${practiceDate}`,
+      songTitle    && `曲名: ${songTitle}`,
+      groupName    && `グループ名: ${groupName}`,
+    ].filter(Boolean).join(' / ');
+
     const promptText = `
 あなたは優秀な議事録作成アシスタントです。
 提供された文字起こしテキストをもとに、練習中のメンバー同士が口頭で行ったフィードバックや話し合いの内容のみを抽出・構造化してください。
+${contextLine ? `【練習情報】${contextLine}\n` : ''}
+【session_name の生成規則】
+「${practiceDate || '日付不明'} ${songTitle ? songTitle + ' ' : ''}練習」の形式で生成すること。
 
 【厳守事項】
 - あなた自身が歌唱を評価したり、新しいアドバイスを捏造することは固く禁じます。
 - メンバーが実際に発言した内容（指摘・決定事項・反省点）だけを抽出してください。
 - 誰が誰に向けて言ったか（対象パート）と、何についての指摘か（カテゴリ）を必ず分類してください。
-- 会話の文脈から、曲のどの部分についての指摘かを抽出し \`section\` に格納すること。フィルターの選択肢が増えすぎるのを防ぐため、表記揺れを極力なくし、「Aメロ」「Bメロ」「1サビ」「ラスサビ」「イントロ」「アウトロ」「全体」「不明」のように短く統一感のある名称で出力すること。
-- 「セクション」の分類は、必ず文字起こしテキストの「会話の文脈（言葉）」からのみ推測すること。テキストの文脈から明確に判断できない場合は直ちに「全体」として出力すること。
+【セクション認識の基準】
+「Aメロ」「Bメロ」「サビ」「イントロ」「ラスサビ」「ブリッジ」等の固有名詞、
+または「最初の」「2番の」「最後の」等の順序表現が明示された場合のみセクションを特定すること。
+「さっきのとこ」「あそこ」等の代名詞のみの場合は直ちに「全体」として出力すること。
+出力名称は「Aメロ」「Bメロ」「1サビ」「ラスサビ」「イントロ」「アウトロ」「全体」「不明」のように
+短く統一感のある形式に揃えること。
 - 文字起こしテキスト内にAIのバグによる無意味な言葉の無限ループや繰り返しが含まれている場合があるが、それらは完全に無視し、意味のあるフィードバック内容のみを抽出すること。
 - 音源のオーバーラップ結合や練習中の反復による「同じ指摘の重複」を検知・排除し、重複する指摘は1つのカードに統合・集約すること。
+
+【パート識別の補助】
+「リード」「トップ」「セカンド」「サード」「フォース」「バリトン」「ベース」「パーカス/ボイパ」
+これらの語が文中に現れない場合、直前の発言文脈からパートを推定すること。
+「さっきのとこ」「あそこ」「そっち」等の代名詞はパート特定の根拠にしないこと。
+それでも判断できない場合のみ「全体」とすること。
 
 【文字起こしテキスト】
 ${transcript}
