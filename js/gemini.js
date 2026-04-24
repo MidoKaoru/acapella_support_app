@@ -158,7 +158,7 @@ class GeminiAudioAnalyzer {
     const payload = {
       contents: [{
         parts: [
-          { text: `この音声ファイルの${startMin}:00〜${endMin}:00の範囲内にある話し声だけを文字起こしして。歌唱（コーラス、リードボーカル、ボイパなど）の部分は絶対に文字起こしに含めず、完全に無視してください。各発言の冒頭に発言開始時刻を付けて出力してください。タイムスタンプは必ず音声ファイル全体の先頭からの絶対時間で記述すること。フォーマットは半角の [MM:SS] または [H:MM:SS] のみを使用し、Markdown装飾（太字など）や全角カッコ（【】）、発言者名の前置きなどを一切行わないこと。` },
+          { text: `この音声ファイルの${startMin}:00〜${endMin}:00の範囲内にある話し声だけを文字起こしして。歌唱（コーラス、リードボーカル、ボイパなど）の部分は絶対に文字起こしに含めず、完全に無視してください。` },
           { file_data: { file_uri: fileUri, mime_type: mimeType } },
         ],
       }],
@@ -173,14 +173,8 @@ class GeminiAudioAnalyzer {
     const data    = await response.json();
     const rawText = this._extractTextFromResponse(data);
 
-    // ハルシネーション対策：同一フレーズの繰り返しを切り詰める
-    function truncateRepetition(text, windowSize = 50, maxRepeats = 5) {
-      const pattern = new RegExp(`(.{${windowSize},})\\1{${maxRepeats},}`, 's');
-      return text.replace(pattern, '$1\n[繰り返し検知により以降を省略]');
-    }
-
     return normalizeMusicTerms(
-      truncateRepetition(rawText)
+      rawText
         .replace(/\n{2,}/g, '\n')
         .trim()
     );
@@ -199,6 +193,8 @@ class GeminiAudioAnalyzer {
 - 誰が誰に向けて言ったか（対象パート）と、何についての指摘か（カテゴリ）を必ず分類してください。
 - 会話の文脈から、曲のどの部分についての指摘かを抽出し \`section\` に格納すること。フィルターの選択肢が増えすぎるのを防ぐため、表記揺れを極力なくし、「Aメロ」「Bメロ」「1サビ」「ラスサビ」「イントロ」「アウトロ」「全体」「不明」のように短く統一感のある名称で出力すること。
 - 「セクション」の分類は、必ず文字起こしテキストの「会話の文脈（言葉）」からのみ推測すること。テキストの文脈から明確に判断できない場合は直ちに「全体」として出力すること。
+- 文字起こしテキスト内にAIのバグによる無意味な言葉の無限ループや繰り返しが含まれている場合があるが、それらは完全に無視し、意味のあるフィードバック内容のみを抽出すること。
+- 音源のオーバーラップ結合や練習中の反復による「同じ指摘の重複」を検知・排除し、重複する指摘は1つのカードに統合・集約すること。
 
 【文字起こしテキスト】
 ${transcript}

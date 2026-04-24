@@ -644,27 +644,6 @@ async function _acquireWakeLock() {
   } catch (_) {}
 }
 
-function _deduplicateTranscript(text, cutoffMinutes) {
-  if (cutoffMinutes === 0) return text;
-  const lines = text.split('\n');
-  const result = [];
-  let keep = false;
-  let hadKeepTrue = false;
-  for (const line of lines) {
-    const m = line.match(/[\[【](\d+):(\d{2})(?::(\d{2}))?[\]】]/);
-    if (m) {
-      const totalMinutes = m[3] !== undefined
-        ? parseInt(m[1]) * 60 + parseInt(m[2])
-        : parseInt(m[1]);
-      keep = totalMinutes >= cutoffMinutes;
-      if (keep) hadKeepTrue = true;
-    }
-    if (keep) result.push(line);
-  }
-  if (!hadKeepTrue) return text;
-  return result.join('\n');
-}
-
 async function _processChunksFrom(startIndex) {
   let analyzer;
   try {
@@ -734,8 +713,7 @@ async function _processChunksFrom(startIndex) {
     const segmentResults = await parallelLimit(tasks, CONCURRENCY_LIMIT);
 
     const fullTranscript = segmentResults
-      .map(({ startMin, text }) => _deduplicateTranscript(text, startMin))
-      .map(t => t.trim())
+      .map(({ text }) => text.trim())
       .filter(Boolean)
       .join('\n');
 
