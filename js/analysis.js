@@ -288,26 +288,30 @@ function _applyInputModeDisplay() {
 }
 
 function _updateConnectivityUI() {
-  const hasKey    = !!getApiKey();
-  const noKeyEl   = document.getElementById('analysis-no-key');
-  const offlineEl = document.getElementById('analysis-offline');
-  const formEl    = document.getElementById('analysis-form');
+  const hasKey      = !!getApiKey();
+  const noKeyEl     = document.getElementById('analysis-no-key');
+  const offlineEl   = document.getElementById('analysis-offline');
+  const formEl      = document.getElementById('analysis-form');
+  const modeCardEl  = document.getElementById('analysis-mode-card');
 
   if (!hasKey) {
     noKeyEl.style.display   = 'block';
     offlineEl.style.display = 'none';
     formEl.style.display    = 'none';
     document.getElementById('analysis-record-panel').style.display = 'none';
+    if (modeCardEl) modeCardEl.style.display = 'none';
     _showDemoSession();
   } else if (!navigator.onLine) {
     noKeyEl.style.display   = 'none';
     offlineEl.style.display = 'block';
+    if (modeCardEl) modeCardEl.style.display = '';
     _applyInputModeDisplay();
     if (_currentResult === null) _clearAnalysisState();
     _updateStartBtn();
   } else {
     noKeyEl.style.display   = 'none';
     offlineEl.style.display = 'none';
+    if (modeCardEl) modeCardEl.style.display = '';
     _applyInputModeDisplay();
     if (_currentResult === null) _clearAnalysisState();
     _updateStartBtn();
@@ -645,11 +649,19 @@ function _deduplicateTranscript(text, cutoffMinutes) {
   const lines = text.split('\n');
   const result = [];
   let keep = false;
+  let hadKeepTrue = false;
   for (const line of lines) {
-    const m = line.match(/^\[(\d+):(\d{2})\]/);
-    if (m) keep = parseInt(m[1]) >= cutoffMinutes;
+    const m = line.match(/[\[【](\d+):(\d{2})(?::(\d{2}))?[\]】]/);
+    if (m) {
+      const totalMinutes = m[3] !== undefined
+        ? parseInt(m[1]) * 60 + parseInt(m[2])
+        : parseInt(m[1]);
+      keep = totalMinutes >= cutoffMinutes;
+      if (keep) hadKeepTrue = true;
+    }
     if (keep) result.push(line);
   }
+  if (!hadKeepTrue) return text;
   return result.join('\n');
 }
 
