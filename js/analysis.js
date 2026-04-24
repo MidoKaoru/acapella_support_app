@@ -683,9 +683,28 @@ async function _processChunksFrom(startIndex) {
     _setState('transcribing');
     _setStepStatus('transcribing', 'running');
 
-    // 30分ステップ・5分オーバーラップ・35分区間で最大3時間をカバー
+    let audioDurationMinutes = 180;
+    try {
+      const objUrl = URL.createObjectURL(_audioFile);
+      audioDurationMinutes = await new Promise((resolve, reject) => {
+        const audio = new Audio();
+        audio.preload = 'metadata';
+        audio.onloadedmetadata = () => {
+          URL.revokeObjectURL(objUrl);
+          resolve(audio.duration / 60);
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(objUrl);
+          reject(new Error('duration取得失敗'));
+        };
+        audio.src = objUrl;
+      });
+    } catch (_) {
+      audioDurationMinutes = 180;
+    }
+
     const segments = [];
-    for (let start = 0; start < 180; start += 30) {
+    for (let start = 0; start < audioDurationMinutes; start += 30) {
       segments.push({ startMin: start, endMin: start + 35 });
     }
 
