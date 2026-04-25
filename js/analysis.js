@@ -36,7 +36,8 @@ const DEMO_SESSION = {
 
 // ─── 並列実行制御 ────────────────────────────────
 
-const CONCURRENCY_LIMIT = 3;
+const CONCURRENCY_LIMIT = 2;
+const MIN_TASK_INTERVAL_MS = 12_000;  // RPM=5 ローリング窓対策
 
 async function parallelLimit(tasks, limit) {
   const results = [];
@@ -50,8 +51,27 @@ async function parallelLimit(tasks, limit) {
   return Promise.all(results);
 }
 
+async function parallelLimitWithInterval(tasks, limit, minIntervalMs, onWait) {
+  const results = [];
+  const executing = new Set();
+  let lastStartTime = 0;
+  for (const task of tasks) {
+    const elapsed = Date.now() - lastStartTime;
+    if (elapsed < minIntervalMs) {
+      if (onWait) onWait();
+      await new Promise(r => setTimeout(r, minIntervalMs - elapsed));
+    }
+    lastStartTime = Date.now();
+    const p = task().then(r => { executing.delete(p); return r; });
+    executing.add(p);
+    results.push(p);
+    if (executing.size >= limit) await Promise.race(executing);
+  }
+  return Promise.all(results);
+}
+
 // ─── 内部状態 ────────────────────────────────────
-let _state            = 'idle'; // 'idle'|'uploading'|'waiting'|'transcribing'|'analyzing'|'done'|'error'
+let _state            = 'idle'; // 'idle'|'uploading'|'waiting'|'transcribing'|'analyzing'|'merging'|'done'|'error'
 let _currentResult    = null;   // 現在表示中の解析結果
 let _currentTranscript = '';    // 現在の文字起こしテキスト
 let _pendingGroupId   = null;   // 保存対象グループID
@@ -112,7 +132,7 @@ function initAnalysis() {
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' &&
-        ['uploading', 'waiting', 'transcribing'].includes(_state)) {
+        ['uploading', 'waiting', 'transcribing', 'analyzing', 'merging'].includes(_state)) {
       showToast('バックグラウンドで処理が中断された可能性があります');
     }
   });
@@ -705,20 +725,28 @@ async function _processChunksFrom(startIndex) {
     let completedCount = 0;
     const totalSegments = segments.length;
 
-    const tasks = segments.map(({ startMin, endMin }) => () =>
+    const tasks = segments.map(({ startMin, endMin }, idx) => () =>
       analyzer.transcribeAudio(fileUri, mimeType, startMin, endMin).then(text => {
         completedCount++;
         _setStepStatus('transcribing', 'running', `(${completedCount}/${totalSegments})`);
         return { startMin, text };
+      }).catch(err => {
+        _failedChunkIndex = idx;
+        throw err;
       })
     );
 
-    const segmentResults = await parallelLimit(tasks, CONCURRENCY_LIMIT);
+    const segmentResults = await parallelLimitWithInterval(
+      tasks, CONCURRENCY_LIMIT, MIN_TASK_INTERVAL_MS,
+      () => _setStepStatus('transcribing', 'waiting')
+    );
 
-    const fullTranscript = segmentResults
+    // ① 空セグメントをフィルタ → fullTranscript 結合・UI表示
+    const segmentTranscripts = segmentResults
       .map(({ text }) => text.trim())
-      .filter(Boolean)
-      .join('\n');
+      .filter(Boolean);
+
+    const fullTranscript = segmentTranscripts.join('\n');
 
     _setStepStatus('transcribing', 'done');
     _showTranscript(fullTranscript);
@@ -729,13 +757,40 @@ async function _processChunksFrom(startIndex) {
     const song = getSongs().groups
       .flatMap(g => g.songs)
       .find(s => s.id === _pendingSongId);
+    const songTitle = song?.title  || '';
+    const groupName = getSongs().groups.find(g => g.id === _pendingGroupId)?.name || '';
 
-    const result = await analyzer.analyzeStructure(fullTranscript, {
-      practiceDate,
-      songTitle:  song?.title  || '',
-      groupName:  getSongs().groups.find(g => g.id === _pendingGroupId)?.name || '',
-    });
+    // ② セグメントごとにカード抽出（空 transcript はスキップ済み）
+    let cardCompletedCount = 0;
+    const cardTasks = segmentTranscripts.map((transcript, idx) => () =>
+      analyzer.analyzeSegmentCards(transcript, { practiceDate, songTitle, groupName }).then(cards => {
+        cardCompletedCount++;
+        _setStepStatus('analyzing', 'running', `(${cardCompletedCount}/${segmentTranscripts.length})`);
+        return cards;
+      }).catch(err => {
+        _failedChunkIndex = idx;
+        throw err;
+      })
+    );
+
+    const cardResults = await parallelLimitWithInterval(
+      cardTasks, CONCURRENCY_LIMIT, MIN_TASK_INTERVAL_MS,
+      () => _setStepStatus('analyzing', 'waiting')
+    );
+    const allCards = cardResults.flat();
+
     _setStepStatus('analyzing', 'done');
+
+    // ③ マージ＆ファイナライズ
+    _setState('merging');
+    _setStepStatus('merging', 'running');
+    const sessionName = `${practiceDate || '日付不明'}${songTitle ? ' ' + songTitle : ''} 練習`;
+    const result = await analyzer.mergeAndFinalize(allCards, {
+      session_name: sessionName,
+      recorded_at:  _jstDateString(),
+    });
+    result.transcript = fullTranscript;
+    _setStepStatus('merging', 'done');
 
     _currentResult     = result;
     _currentTranscript = fullTranscript;
@@ -744,7 +799,9 @@ async function _processChunksFrom(startIndex) {
 
   } catch (err) {
     _setState('error');
-    _showError(err.message);
+    const segLabel = _failedChunkIndex >= 0 ? `セグメント${_failedChunkIndex + 1}で失敗: ` : '';
+    _showError(segLabel + err.message);
+    _showRetryButton(_failedChunkIndex);
   } finally {
     if (uploadedFileName) {
       try { await analyzer.deleteFile(uploadedFileName); } catch (_) {}
@@ -761,7 +818,7 @@ function _setState(state) {
   const progress = document.getElementById('analysis-progress');
   const startBtn = document.getElementById('analysis-start-btn');
 
-  if (['uploading', 'waiting', 'transcribing', 'analyzing'].includes(state)) {
+  if (['uploading', 'waiting', 'transcribing', 'analyzing', 'merging'].includes(state)) {
     progress.style.display = 'block';
     startBtn.disabled = true;
     document.querySelectorAll('.analysis-step').forEach(el => {
@@ -775,7 +832,7 @@ function _setState(state) {
   }
 }
 
-function _setStepStatus(step, status, chunkLabel) {
+function _setStepStatus(step, status, progressLabel) {
   const row   = document.querySelector(`.analysis-step[data-step="${step}"]`);
   const label = row?.querySelector('.analysis-step-status');
   if (!row) return;
@@ -783,10 +840,23 @@ function _setStepStatus(step, status, chunkLabel) {
   row.classList.remove('running', 'done');
   if (status === 'running') {
     row.classList.add('running');
-    if (label) label.textContent = chunkLabel ? `処理中… ${chunkLabel}` : '処理中…';
+    if (label) {
+      if (step === 'transcribing') {
+        label.textContent = progressLabel ? `文字起こし中 ${progressLabel}` : '文字起こし中…';
+      } else if (step === 'analyzing') {
+        label.textContent = progressLabel ? `構造化中 ${progressLabel}` : '構造化中…';
+      } else if (step === 'merging') {
+        label.textContent = 'マージ中…';
+      } else {
+        label.textContent = progressLabel ? `処理中… ${progressLabel}` : '処理中…';
+      }
+    }
+  } else if (status === 'waiting') {
+    row.classList.add('running');
+    if (label) label.textContent = 'レート制限回避のため待機中';
   } else if (status === 'done') {
     row.classList.add('done');
-    if (label) label.textContent = chunkLabel ? `完了 ${chunkLabel}` : '完了';
+    if (label) label.textContent = progressLabel ? `完了 ${progressLabel}` : '完了';
   }
 }
 
@@ -814,17 +884,17 @@ function _hideError() {
   card.style.display = 'none';
 }
 
-function _showRetryButton(chunkIndex) {
+function _showRetryButton(segmentIndex) {
   const card = document.getElementById('analysis-error');
   const btn = document.createElement('button');
   btn.className = 'action-btn-primary analysis-retry-btn';
-  btn.textContent = _chunks.length > 1
-    ? `チャンク ${chunkIndex + 1} から再試行`
+  btn.textContent = segmentIndex >= 0
+    ? `セグメント ${segmentIndex + 1} から再試行`
     : '最初から再試行';
   btn.addEventListener('click', () => {
     _failedChunkIndex = -1;
     _hideError();
-    _processChunksFrom(chunkIndex);
+    _processChunksFrom(0);
   });
   card.appendChild(btn);
 }
